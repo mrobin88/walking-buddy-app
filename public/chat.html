@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walking Buddy Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      margin-bottom: 10px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 15px;
+    }
+
+    .nav-btn {
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: background 0.3s;
+      font-size: 14px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .nav-btn.active {
+      background: rgba(255,255,255,0.4);
+    }
+
+    .chat-container {
+      flex: 1;
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .sidebar {
+      width: 300px;
+      border-right: 1px solid #eee;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+      background: #f8f9fa;
+    }
+
+    .sidebar-header h3 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .user-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .user-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .user-item:hover {
+      background: #f8f9fa;
+    }
+
+    .user-item.active {
+      background: #e3f2fd;
+      border-left: 3px solid #2196f3;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #667eea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      margin-right: 12px;
+    }
+
+    .user-info {
+      flex: 1;
+    }
+
+    .user-name {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 2px;
+    }
+
+    .user-status {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .status-online {
+      color: #4caf50;
+    }
+
+    .status-offline {
+      color: #f44336;
+    }
+
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+      background: #f8f9fa;
+    }
+
+    .chat-header h3 {
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .chat-status {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .messages-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #fafafa;
+    }
+
+    .message {
+      margin-bottom: 15px;
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .message.own {
+      flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      background: #667eea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+      margin: 0 10px;
+    }
+
+    .message-content {
+      max-width: 60%;
+      background: white;
+      padding: 12px 16px;
+      border-radius: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    .message.own .message-content {
+      background: #667eea;
+      color: white;
+    }
+
+    .message-text {
+      margin-bottom: 5px;
+      line-height: 1.4;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: #999;
+      text-align: right;
+    }
+
+    .message.own .message-time {
+      color: rgba(255,255,255,0.7);
+    }
+
+    .chat-input-container {
+      padding: 20px;
+      border-top: 1px solid #eee;
+      background: white;
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      border-radius: 25px;
+      font-size: 14px;
+      resize: none;
+      max-height: 100px;
+      min-height: 45px;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    }
+
+    .send-btn {
+      padding: 12px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+
+    .send-btn:hover {
+      background: #5a6fd8;
+    }
+
+    .send-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .no-chat-selected {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #666;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    .typing-indicator {
+      padding: 10px 20px;
+      color: #666;
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    .login-prompt {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-container {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .login-container h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .login-container input {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    .login-container input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .login-container button {
+      width: 100%;
+      padding: 15px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background-color 0.3s;
+    }
+
+    .login-container button:hover {
+      background: #5a6fd8;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginView" class="login-prompt">
+    <div class="login-container">
+      <h2>Walking Buddy Chat</h2>
+      <p>Enter your username to start chatting!</p>
+      <input type="text" id="usernameInput" placeholder="Enter your username..." maxlength="20" />
+      <button onclick="login()">Start Chatting</button>
+    </div>
+  </div>
+
+  <!-- Chat Interface -->
+  <div id="chatView" style="display: none;">
+    <div class="header">
+      <h1>Walking Buddy Chat</h1>
+      <p>Connect with other walkers in real-time</p>
+      <div class="nav-buttons">
+        <a href="/" class="nav-btn">🏠 Main App</a>
+        <a href="/chat" class="nav-btn active">💬 Chat</a>
+        <a href="/admin" class="nav-btn">⚙️ Admin</a>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <!-- Sidebar with user list -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h3>Online Users</h3>
+          <p>Select a user to start chatting</p>
+        </div>
+        <div class="user-list" id="userList">
+          <div style="text-align: center; padding: 20px; color: #666;">
+            Loading users...
+          </div>
+        </div>
+      </div>
+
+      <!-- Main chat area -->
+      <div class="chat-main">
+        <div class="chat-header" id="chatHeader">
+          <div class="no-chat-selected">
+            <div>
+              <h3>Welcome to Walking Buddy Chat!</h3>
+              <p>Select a user from the sidebar to start a conversation</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+          <div class="no-chat-selected">
+            <div>
+              <h3>💬</h3>
+              <p>Choose someone to chat with</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-container" id="chatInputContainer" style="display: none;">
+          <div class="chat-input-wrapper">
+            <textarea 
+              id="chatInput" 
+              class="chat-input" 
+              placeholder="Type your message..." 
+              rows="1"
+              onkeypress="handleKeyPress(event)"
+            ></textarea>
+            <button id="sendBtn" class="send-btn" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentUser = null;
+    let selectedChatUser = null;
+    let connectedUsers = [];
+    let messages = {};
+
+    // Initialize chat
+    document.addEventListener('DOMContentLoaded', function() {
+      // Auto-resize textarea
+      const chatInput = document.getElementById('chatInput');
+      if (chatInput) {
+        chatInput.addEventListener('input', function() {
+          this.style.height = 'auto';
+          this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
+      }
+    });
+
+    // Login function
+    function login() {
+      const username = document.getElementById('usernameInput').value.trim();
+      if (!username) {
+        alert('Please enter a username');
+        return;
+      }
+
+      socket.emit('user_login', { username });
+    }
+
+    // Handle login success
+    socket.on('login_success', function(data) {
+      currentUser = data.user;
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('chatView').style.display = 'flex';
+      
+      // Load connected users
+      loadConnectedUsers();
+    });
+
+    // Handle login error
+    socket.on('login_error', function(data) {
+      alert('Login error: ' + data.message);
+    });
+
+    // Load connected users
+    function loadConnectedUsers() {
+      socket.emit('get_connected_users');
+    }
+
+    // Receive connected users
+    socket.on('connected_users', function(users) {
+      connectedUsers = users.filter(user => user.id !== currentUser.id);
+      displayUsers(connectedUsers);
+    });
+
+    // Display users in sidebar
+    function displayUsers(users) {
+      const userList = document.getElementById('userList');
+      
+      if (users.length === 0) {
+        userList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No other users online</div>';
+        return;
+      }
+
+      userList.innerHTML = users.map(user => `
+        <div class="user-item" onclick="selectUser('${user.id}')" data-user-id="${user.id}">
+          <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
+          <div class="user-info">
+            <div class="user-name">${user.username}</div>
+            <div class="user-status status-online">Online</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Select user to chat with
+    function selectUser(userId) {
+      const user = connectedUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      selectedChatUser = user;
+      
+      // Update UI
+      document.querySelectorAll('.user-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      document.querySelector(`[data-user-id="${userId}"]`).classList.add('active');
+      
+      // Update chat header
+      document.getElementById('chatHeader').innerHTML = `
+        <h3>${user.username}</h3>
+        <div class="chat-status">Online</div>
+      `;
+      
+      // Show chat input
+      document.getElementById('chatInputContainer').style.display = 'block';
+      
+      // Load messages for this user
+      loadMessages(userId);
+      
+      // Focus on input
+      document.getElementById('chatInput').focus();
+    }
+
+    // Load messages for a user
+    function loadMessages(userId) {
+      if (!messages[userId]) {
+        messages[userId] = [];
+      }
+      displayMessages(userId);
+    }
+
+    // Display messages
+    function displayMessages(userId) {
+      const messagesContainer = document.getElementById('messagesContainer');
+      const userMessages = messages[userId] || [];
+      
+      if (userMessages.length === 0) {
+        messagesContainer.innerHTML = `
+          <div class="no-chat-selected">
+            <div>
+              <h3>💬</h3>
+              <p>Start a conversation with ${connectedUsers.find(u => u.id === userId)?.username}</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      messagesContainer.innerHTML = userMessages.map(msg => `
+        <div class="message ${msg.from === currentUser.id ? 'own' : ''}">
+          <div class="message-avatar">
+            ${msg.from === currentUser.id ? currentUser.username.charAt(0).toUpperCase() : selectedChatUser.username.charAt(0).toUpperCase()}
+          </div>
+          <div class="message-content">
+            <div class="message-text">${msg.message}</div>
+            <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+          </div>
+        </div>
+      `).join('');
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Send message
+    function sendMessage() {
+      if (!selectedChatUser) return;
+      
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      // Add message to local state
+      const messageObj = {
+        from: currentUser.id,
+        to: selectedChatUser.id,
+        message: message,
+        timestamp: new Date()
+      };
+      
+      if (!messages[selectedChatUser.id]) {
+        messages[selectedChatUser.id] = [];
+      }
+      messages[selectedChatUser.id].push(messageObj);
+      
+      // Display message
+      displayMessages(selectedChatUser.id);
+      
+      // Send via socket
+      socket.emit('chat_message', {
+        to: selectedChatUser.id,
+        message: message
+      });
+      
+      // Clear input
+      input.value = '';
+      input.style.height = 'auto';
+    }
+
+    // Handle key press in chat input
+    function handleKeyPress(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // Receive message
+    socket.on('chat_message', function(data) {
+      const fromUserId = data.from;
+      
+      // Add to messages
+      if (!messages[fromUserId]) {
+        messages[fromUserId] = [];
+      }
+      
+      messages[fromUserId].push({
+        from: fromUserId,
+        to: currentUser.id,
+        message: data.message,
+        timestamp: new Date()
+      });
+      
+      // Update display if this user is selected
+      if (selectedChatUser && selectedChatUser.id === fromUserId) {
+        displayMessages(fromUserId);
+      }
+    });
+
+    // Handle user disconnect
+    socket.on('user_disconnected', function(userId) {
+      connectedUsers = connectedUsers.filter(user => user.id !== userId);
+      displayUsers(connectedUsers);
+      
+      if (selectedChatUser && selectedChatUser.id === userId) {
+        selectedChatUser = null;
+        document.getElementById('chatHeader').innerHTML = `
+          <div class="no-chat-selected">
+            <div>
+              <h3>User Disconnected</h3>
+              <p>Select another user to continue chatting</p>
+            </div>
+          </div>
+        `;
+        document.getElementById('chatInputContainer').style.display = 'none';
+      }
+    });
+
+    // Handle user connect
+    socket.on('user_connected', function(user) {
+      if (user.id !== currentUser.id) {
+        connectedUsers.push(user);
+        displayUsers(connectedUsers);
+      }
+    });
+  </script>
+</body>
+</html> 

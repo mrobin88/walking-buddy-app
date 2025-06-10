@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walking Buddy App</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: background 0.3s;
+      font-size: 14px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .nav-btn.active {
+      background: rgba(255,255,255,0.4);
+    }
+
+    .auth-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 60vh;
+    }
+
+    .auth-form {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .auth-form h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin-bottom: 10px;
+    }
+
+    .btn:hover {
+      background: #5a6fd8;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .auth-toggle {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .auth-toggle a {
+      color: #667eea;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .auth-toggle a:hover {
+      text-decoration: underline;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .user-profile {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    .profile-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .profile-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #667eea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 32px;
+      font-weight: bold;
+      margin-right: 20px;
+    }
+
+    .profile-info h3 {
+      margin-bottom: 5px;
+      color: #333;
+    }
+
+    .profile-info p {
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .stat-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      border-left: 4px solid #667eea;
+    }
+
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Walking Buddy App</h1>
+      <p>Find walking buddies and explore together</p>
+      <div class="nav-buttons">
+        <a href="/" class="nav-btn active">🏠 Home</a>
+        <a href="/chat" class="nav-btn">💬 Chat</a>
+        <a href="/profile" class="nav-btn">👤 Profile</a>
+      </div>
+    </div>
+
+    <!-- Authentication Forms -->
+    <div id="authSection" class="auth-container">
+      <!-- Login Form -->
+      <div id="loginForm" class="auth-form">
+        <h2>Welcome Back!</h2>
+        <div id="loginError" class="error-message hidden"></div>
+        <form onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" required>
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" required>
+          </div>
+          <button type="submit" class="btn">Login</button>
+        </form>
+        <div class="auth-toggle">
+          <a onclick="toggleAuth()">Don't have an account? Sign up</a>
+        </div>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signupForm" class="auth-form hidden">
+        <h2>Create Account</h2>
+        <div id="signupError" class="error-message hidden"></div>
+        <form onsubmit="handleSignup(event)">
+          <div class="form-group">
+            <label for="signupUsername">Username</label>
+            <input type="text" id="signupUsername" required>
+          </div>
+          <div class="form-group">
+            <label for="signupEmail">Email</label>
+            <input type="email" id="signupEmail" required>
+          </div>
+          <div class="form-group">
+            <label for="signupFirstName">First Name</label>
+            <input type="text" id="signupFirstName" required>
+          </div>
+          <div class="form-group">
+            <label for="signupLastName">Last Name</label>
+            <input type="text" id="signupLastName" required>
+          </div>
+          <div class="form-group">
+            <label for="signupPassword">Password</label>
+            <input type="password" id="signupPassword" required minlength="8">
+          </div>
+          <div class="form-group">
+            <label for="signupPasswordConfirm">Confirm Password</label>
+            <input type="password" id="signupPasswordConfirm" required minlength="8">
+          </div>
+          <button type="submit" class="btn">Sign Up</button>
+        </form>
+        <div class="auth-toggle">
+          <a onclick="toggleAuth()">Already have an account? Login</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Profile Section -->
+    <div id="userSection" class="hidden">
+      <div class="user-profile">
+        <div class="profile-header">
+          <div class="profile-avatar" id="userAvatar">U</div>
+          <div class="profile-info">
+            <h3 id="userName">User Name</h3>
+            <p id="userEmail">user@example.com</p>
+            <p id="userBio">No bio yet</p>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="totalWalks">0</div>
+            <div class="stat-label">Total Walks</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="totalDistance">0</div>
+            <div class="stat-label">Total Distance (km)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="totalTime">0</div>
+            <div class="stat-label">Total Time (min)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="averageRating">0</div>
+            <div class="stat-label">Average Rating</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center;">
+          <button class="btn" onclick="startWalking()">Start Walking</button>
+          <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let accessToken = localStorage.getItem('accessToken');
+    let refreshToken = localStorage.getItem('refreshToken');
+
+    // Check authentication on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      if (accessToken) {
+        checkAuth();
+      }
+    });
+
+    function toggleAuth() {
+      const loginForm = document.getElementById('loginForm');
+      const signupForm = document.getElementById('signupForm');
+      
+      if (loginForm.classList.contains('hidden')) {
+        loginForm.classList.remove('hidden');
+        signupForm.classList.add('hidden');
+      } else {
+        loginForm.classList.add('hidden');
+        signupForm.classList.remove('hidden');
+      }
+      
+      // Clear error messages
+      document.getElementById('loginError').classList.add('hidden');
+      document.getElementById('signupError').classList.add('hidden');
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      try {
+        const response = await fetch('/api/auth/login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Store tokens
+          localStorage.setItem('accessToken', data.access);
+          localStorage.setItem('refreshToken', data.refresh);
+          accessToken = data.access;
+          refreshToken = data.refresh;
+          
+          // Update UI
+          currentUser = data.user;
+          showUserProfile();
+        } else {
+          showError('loginError', data.error || 'Login failed');
+        }
+      } catch (error) {
+        showError('loginError', 'Network error. Please try again.');
+      }
+    }
+
+    async function handleSignup(event) {
+      event.preventDefault();
+      
+      const username = document.getElementById('signupUsername').value;
+      const email = document.getElementById('signupEmail').value;
+      const firstName = document.getElementById('signupFirstName').value;
+      const lastName = document.getElementById('signupLastName').value;
+      const password = document.getElementById('signupPassword').value;
+      const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+      
+      if (password !== passwordConfirm) {
+        showError('signupError', 'Passwords do not match');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/auth/register/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username,
+            email,
+            first_name: firstName,
+            last_name: lastName,
+            password,
+            password_confirm: passwordConfirm
+          }),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Store tokens
+          localStorage.setItem('accessToken', data.access);
+          localStorage.setItem('refreshToken', data.refresh);
+          accessToken = data.access;
+          refreshToken = data.refresh;
+          
+          // Update UI
+          currentUser = data.user;
+          showUserProfile();
+        } else {
+          showError('signupError', data.error || 'Registration failed');
+        }
+      } catch (error) {
+        showError('signupError', 'Network error. Please try again.');
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const response = await fetch('/api/auth/check-auth/', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          currentUser = data;
+          showUserProfile();
+        } else {
+          // Try to refresh token
+          await refreshAccessToken();
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        logout();
+      }
+    }
+
+    async function refreshAccessToken() {
+      try {
+        const response = await fetch('/api/token/refresh/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          localStorage.setItem('accessToken', data.access);
+          accessToken = data.access;
+          await checkAuth();
+        } else {
+          logout();
+        }
+      } catch (error) {
+        logout();
+      }
+    }
+
+    function showUserProfile() {
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('userSection').classList.remove('hidden');
+      
+      // Update profile information
+      document.getElementById('userName').textContent = currentUser.username;
+      document.getElementById('userEmail').textContent = currentUser.email;
+      document.getElementById('userBio').textContent = currentUser.bio || 'No bio yet';
+      document.getElementById('userAvatar').textContent = currentUser.username.charAt(0).toUpperCase();
+      
+      // Update stats
+      document.getElementById('totalWalks').textContent = currentUser.total_walks;
+      document.getElementById('totalDistance').textContent = currentUser.total_distance;
+      document.getElementById('totalTime').textContent = currentUser.total_time;
+      document.getElementById('averageRating').textContent = currentUser.average_rating;
+    }
+
+    function showError(elementId, message) {
+      const errorElement = document.getElementById(elementId);
+      errorElement.textContent = message;
+      errorElement.classList.remove('hidden');
+    }
+
+    function logout() {
+      // Clear tokens
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      accessToken = null;
+      refreshToken = null;
+      currentUser = null;
+      
+      // Show auth forms
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('userSection').classList.add('hidden');
+      
+      // Clear forms
+      document.getElementById('loginForm').reset();
+      document.getElementById('signupForm').reset();
+    }
+
+    function startWalking() {
+      // Redirect to walking interface or show walking modal
+      alert('Walking feature coming soon!');
+    }
+  </script>
+</body>
+</html>
