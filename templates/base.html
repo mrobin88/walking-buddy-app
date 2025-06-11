@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>{% block title %}Walking Buddy - Find Your Perfect Walking Partner{% endblock %}</title>
+    <meta name="description" content="{% block description %}Connect with walking buddies in your area. Find the perfect walking partner for your daily walks, hikes, and outdoor adventures.{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}walking buddy, walking partner, hiking, outdoor, fitness, social walking, walking app{% endblock %}">
+    <meta name="author" content="Walking Buddy">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:title" content="{% block og_title %}{% block title %}Walking Buddy - Find Your Perfect Walking Partner{% endblock %}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{% block description %}Connect with walking buddies in your area. Find the perfect walking partner for your daily walks, hikes, and outdoor adventures.{% endblock %}{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/walking-buddy-og.jpg' %}{% endblock %}">
+    <meta property="og:site_name" content="Walking Buddy">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{{ request.build_absolute_uri }}">
+    <meta property="twitter:title" content="{% block twitter_title %}{% block title %}Walking Buddy - Find Your Perfect Walking Partner{% endblock %}{% endblock %}">
+    <meta property="twitter:description" content="{% block twitter_description %}{% block description %}Connect with walking buddies in your area. Find the perfect walking partner for your daily walks, hikes, and outdoor adventures.{% endblock %}{% endblock %}">
+    <meta property="twitter:image" content="{% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/walking-buddy-og.jpg' %}{% endblock %}">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Walking Buddy",
+        "description": "Connect with walking buddies in your area. Find the perfect walking partner for your daily walks, hikes, and outdoor adventures.",
+        "url": "{{ request.scheme }}://{{ request.get_host }}",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "Walking Buddy"
+        }
+    }
+    </script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="{% url 'home' %}">
+                    <i class="fas fa-walking"></i>
+                    <span>Walking Buddy</span>
+                </a>
+            </div>
+            
+            <div class="nav-menu">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'home' %}" class="nav-link">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    <a href="{% url 'discover' %}" class="nav-link">
+                        <i class="fas fa-search"></i>
+                        <span>Discover</span>
+                    </a>
+                    <a href="{% url 'chat_list' %}" class="nav-link">
+                        <i class="fas fa-comments"></i>
+                        <span>Chats</span>
+                        {% if unread_count > 0 %}
+                            <span class="badge">{{ unread_count }}</span>
+                        {% endif %}
+                    </a>
+                    <a href="{% url 'profile' %}" class="nav-link">
+                        <i class="fas fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-btn" aria-label="User menu">
+                            <img src="{{ user.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                                 alt="{{ user.username }}" class="nav-avatar">
+                            <span>{{ user.username }}</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="nav-dropdown-content">
+                            <a href="{% url 'profile' %}">
+                                <i class="fas fa-user"></i>
+                                <span>My Profile</span>
+                            </a>
+                            <a href="{% url 'settings' %}">
+                                <i class="fas fa-cog"></i>
+                                <span>Settings</span>
+                            </a>
+                            {% if not user.is_premium %}
+                                <a href="{% url 'subscribe' %}" class="premium-link">
+                                    <i class="fas fa-crown"></i>
+                                    <span>Upgrade to Premium</span>
+                                </a>
+                            {% endif %}
+                            <hr>
+                            <a href="{% url 'logout' %}">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </a>
+                        </div>
+                    </div>
+                {% else %}
+                    <a href="{% url 'login' %}" class="nav-link">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Login</span>
+                    </a>
+                    <a href="{% url 'register' %}" class="nav-link btn-primary">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Sign Up</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                        <button type="button" class="alert-close" onclick="this.parentElement.remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-section">
+                <h3>Walking Buddy</h3>
+                <p>Connect with walking buddies in your area and enjoy the outdoors together.</p>
+                <div class="social-links">
+                    <a href="#" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
+                    <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Features</h4>
+                <ul>
+                    <li><a href="{% url 'discover' %}">Find Walking Buddies</a></li>
+                    <li><a href="{% url 'chat_list' %}">Real-time Chat</a></li>
+                    <li><a href="{% url 'profile' %}">Profile Management</a></li>
+                    <li><a href="{% url 'subscribe' %}">Premium Features</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Support</h4>
+                <ul>
+                    <li><a href="{% url 'help' %}">Help Center</a></li>
+                    <li><a href="{% url 'contact' %}">Contact Us</a></li>
+                    <li><a href="{% url 'privacy' %}">Privacy Policy</a></li>
+                    <li><a href="{% url 'terms' %}">Terms of Service</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h4>Company</h4>
+                <ul>
+                    <li><a href="{% url 'about' %}">About Us</a></li>
+                    <li><a href="{% url 'careers' %}">Careers</a></li>
+                    <li><a href="{% url 'blog' %}">Blog</a></li>
+                    <li><a href="{% url 'press' %}">Press</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; {% now "Y" %} Walking Buddy. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/chat.js' %}"></script>
+    <script src="{% static 'js/location.js' %}"></script>
+    
+    <!-- Ad tracking script -->
+    <script>
+        function trackAdEvent(eventType, placement, adId) {
+            fetch('/api/ads/track/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    event_type: eventType,
+                    placement: placement,
+                    ad_id: adId
+                })
+            });
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

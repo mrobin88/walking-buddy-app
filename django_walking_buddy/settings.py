@@ -26,18 +26,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sitemaps',
     
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'channels',
-    'django_extensions',
+    'meta',
     
     # Local apps
     'users',
-    'walks',
     'chat',
+    'walks',
+    'ads',
 ]
 
 MIDDLEWARE = [
@@ -74,13 +76,30 @@ TEMPLATES = [
 WSGI_APPLICATION = 'django_walking_buddy.wsgi.application'
 ASGI_APPLICATION = 'django_walking_buddy.asgi.application'
 
-# Database - Simplified configuration
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database configuration
+if os.environ.get('DB_NAME'):
+    # PostgreSQL configuration
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'walking_buddy_db'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+            'OPTIONS': {
+                'client_encoding': 'UTF8',
+            },
+        }
     }
-}
+else:
+    # SQLite configuration (fallback)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -249,4 +268,13 @@ LOGGING = {
 }
 
 # Create logs directory if it doesn't exist
-os.makedirs(BASE_DIR / 'logs', exist_ok=True) 
+os.makedirs(BASE_DIR / 'logs', exist_ok=True)
+
+# Stripe Configuration
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_your_publishable_key')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_your_secret_key')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_your_webhook_secret')
+STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_your_monthly_subscription')
+
+# Site configuration
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000') 

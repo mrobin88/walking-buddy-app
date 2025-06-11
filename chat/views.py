@@ -42,4 +42,17 @@ def mark_dm_read(request, dm_id):
     dm = get_object_or_404(DirectMessage, pk=dm_id, recipient=request.user)
     dm.read = True
     dm.save(update_fields=['read'])
-    return Response({'message': 'Marked as read'}) 
+    return Response({'message': 'Marked as read'})
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def chat_limits(request):
+    """Get user's chat limits and usage."""
+    profile = request.user.profile
+    return Response({
+        'is_premium': profile.is_premium,
+        'daily_chats_used': profile.daily_chats_used,
+        'daily_chats_limit': 5 if not profile.is_premium else None,
+        'can_send_chat': profile.can_send_chat(),
+        'remaining_chats': max(0, 5 - profile.daily_chats_used) if not profile.is_premium else None,
+    }) 

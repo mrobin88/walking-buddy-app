@@ -15,7 +15,14 @@ import os
 from django.db import connection
 from django.http import JsonResponse
 from django.conf import settings
+import stripe
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.utils import timezone
+from datetime import timedelta
 
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
@@ -356,4 +363,129 @@ def system_status(request):
         return JsonResponse({
             'error': str(e),
             'status': 'error'
-        }, status=500) 
+        }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_subscription(request):
+    """Create Stripe checkout session for premium subscription."""
+    try:
+        # Create or get Stripe customer
+        if not request.user.profile.stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=request.user.email,
+                name=f"{request.user.first_name} {request.user.last_name}",
+                metadata={'user_id': request.user.id}
+            )
+            request.user.profile.stripe_customer_id = customer.id
+            request.user.profile.save()
+        
+        # Create checkout session
+        checkout_session = stripe.checkout.Session.create(
+            customer=request.user.profile.stripe_customer_id,
+            payment_method_types=['card'],
+            line_items=[{
+                'price': settings.STRIPE_PRICE_ID,  # Monthly subscription price ID
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f"{settings.SITE_URL}/profile/?success=true",
+            cancel_url=f"{settings.SITE_URL}/profile/?canceled=true",
+            metadata={'user_id': request.user.id}
+        )
+        
+        return Response({
+            'session_id': checkout_session.id,
+            'checkout_url': checkout_session.url
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def stripe_webhook(request):
+    """Handle Stripe webhooks for subscription events."""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError as e:
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+    
+    # Handle subscription events
+    if event['type'] == 'customer.subscription.created':
+        handle_subscription_created(event)
+    elif event['type'] == 'customer.subscription.updated':
+        handle_subscription_updated(event)
+    elif event['type'] == 'customer.subscription.deleted':
+        handle_subscription_canceled(event)
+    
+    return JsonResponse({'status': 'success'})
+
+
+def handle_subscription_created(event):
+    """Handle new subscription creation."""
+    subscription = event['data']['object']
+    user = User.objects.get(profile__stripe_customer_id=subscription['customer'])
+    
+    user.profile.is_premium = True
+    user.profile.subscription_expires = timezone.now() + timedelta(days=30)
+    user.profile.can_see_profile_views = True
+    user.profile.can_hide_ads = True
+    user.profile.extended_discovery_radius = True
+    user.profile.save()
+
+
+def handle_subscription_updated(event):
+    """Handle subscription updates."""
+    subscription = event['data']['object']
+    user = User.objects.get(profile__stripe_customer_id=subscription['customer'])
+    
+    if subscription['status'] == 'active':
+        user.profile.is_premium = True
+        user.profile.subscription_expires = timezone.now() + timedelta(days=30)
+    else:
+        user.profile.is_premium = False
+        user.profile.subscription_expires = None
+    
+    user.profile.save()
+
+
+def handle_subscription_canceled(event):
+    """Handle subscription cancellation."""
+    subscription = event['data']['object']
+    user = User.objects.get(profile__stripe_customer_id=subscription['customer'])
+    
+    user.profile.is_premium = False
+    user.profile.subscription_expires = None
+    user.profile.save()
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def subscription_status(request):
+    """Get user's subscription status."""
+    profile = request.user.profile
+    return Response({
+        'is_premium': profile.is_premium,
+        'subscription_expires': profile.subscription_expires.isoformat() if profile.subscription_expires else None,
+        'daily_chats_used': profile.daily_chats_used,
+        'daily_chats_limit': 5 if not profile.is_premium else None,
+        'can_send_chat': profile.can_send_chat(),
+        'features': {
+            'can_see_profile_views': profile.can_see_profile_views,
+            'can_hide_ads': profile.can_hide_ads,
+            'extended_discovery_radius': profile.extended_discovery_radius,
+        }
+    }) 

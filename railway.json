@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn django_walking_buddy.wsgi:application --bind 0.0.0.0:$PORT",
+    "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn django_walking_buddy.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",

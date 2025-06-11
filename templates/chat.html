@@ -403,7 +403,6 @@
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
     let currentUser = null;
     let accessToken = localStorage.getItem('accessToken');
@@ -449,7 +448,7 @@
 
     function connectWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/chat/`;
+      const wsUrl = `${protocol}//${window.location.host}/ws/chat/?token=${accessToken}`;
       
       chatSocket = new WebSocket(wsUrl);
       
@@ -607,7 +606,7 @@
     }
 
     function sendMessage() {
-      const messageInput = document.getElementById('messageInput');
+      const messageInput = document.querySelector('.chat-input');
       const message = messageInput.value.trim();
       
       if (message && selectedUser && chatSocket) {
@@ -637,14 +636,14 @@
 
     // Handle Enter key in message input
     document.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter' && e.target.id === 'messageInput') {
+      if (e.key === 'Enter' && e.target.classList.contains('chat-input')) {
         sendMessage();
       }
     });
 
     // Handle typing indicator
     let typingTimeout;
-    document.getElementById('messageInput').addEventListener('input', function() {
+    document.querySelector('.chat-input').addEventListener('input', function() {
       if (selectedUser && chatSocket) {
         // Send typing indicator
         chatSocket.send(JSON.stringify({

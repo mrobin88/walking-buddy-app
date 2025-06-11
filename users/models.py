@@ -73,6 +73,11 @@ class User(AbstractUser):
         """Get user's full name."""
         return f"{self.first_name} {self.last_name}".strip() or self.username
     
+    @property
+    def is_premium(self):
+        """Check if user has premium subscription."""
+        return hasattr(self, 'profile') and self.profile.is_premium
+    
     def update_location(self, latitude, longitude):
         """Update user's location."""
         self.latitude = latitude
@@ -118,7 +123,51 @@ class User(AbstractUser):
             },
             'is_online': self.is_online,
             'last_active': self.last_active.isoformat() if self.last_active else None,
+            'is_premium': self.is_premium,
         }
+
+
+class Profile(models.Model):
+    """Extended user profile with premium features."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    is_premium = models.BooleanField(default=False)
+    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
+    subscription_expires = models.DateTimeField(null=True, blank=True)
+    daily_chats_used = models.PositiveIntegerField(default=0)
+    last_chat_reset = models.DateField(auto_now_add=True)
+    profile_views = models.PositiveIntegerField(default=0)
+    
+    # Premium features tracking
+    can_see_profile_views = models.BooleanField(default=False)
+    can_hide_ads = models.BooleanField(default=False)
+    extended_discovery_radius = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'user_profiles'
+    
+    def __str__(self):
+        return f"{self.user.username} Profile ({'Premium' if self.is_premium else 'Free'})"
+    
+    def can_send_chat(self):
+        """Check if user can send a chat message based on tier."""
+        if self.is_premium:
+            return True
+        return self.daily_chats_used < 5
+    
+    def increment_chat_usage(self):
+        """Increment daily chat usage."""
+        if not self.is_premium:
+            self.daily_chats_used += 1
+            self.save(update_fields=['daily_chats_used'])
+    
+    def reset_daily_chats(self):
+        """Reset daily chat count (called by management command)."""
+        if not self.is_premium:
+            self.daily_chats_used = 0
+            self.save(update_fields=['daily_chats_used'])
 
 
 class Friendship(models.Model):

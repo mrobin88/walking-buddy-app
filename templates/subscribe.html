@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Upgrade to Premium - Walking Buddy{% endblock %}
+{% block description %}Unlock unlimited chats, extended discovery radius, profile views, and ad-free experience with Walking Buddy Premium.{% endblock %}
+
+{% block extra_head %}
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+.premium-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    color: white;
+    text-align: center;
+}
+
+.premium-header {
+    margin-bottom: 3rem;
+}
+
+.premium-header h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.premium-header p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+.pricing-card {
+    background: rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 2rem;
+    margin: 2rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.price {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.price .currency {
+    font-size: 1.5rem;
+    vertical-align: top;
+}
+
+.price .period {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+.features-list {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.features-list li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+}
+
+.features-list li:last-child {
+    border-bottom: none;
+}
+
+.features-list i {
+    margin-right: 1rem;
+    color: #4ade80;
+    font-size: 1.2rem;
+}
+
+.subscribe-btn {
+    background: #4ade80;
+    color: #1f2937;
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.subscribe-btn:hover {
+    background: #22c55e;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.subscribe-btn:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.current-plan {
+    background: rgba(74, 222, 128, 0.2);
+    border: 2px solid #4ade80;
+    padding: 1rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+}
+
+.loading {
+    display: none;
+}
+
+.loading.show {
+    display: inline-block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="premium-container">
+    <div class="premium-header">
+        <h1>🚀 Upgrade to Premium</h1>
+        <p>Unlock unlimited chats, extended discovery, and an ad-free experience</p>
+    </div>
+
+    <div class="pricing-card">
+        <div class="price">
+            <span class="currency">$</span>9.99<span class="period">/month</span>
+        </div>
+        
+        <ul class="features-list">
+            <li>
+                <i class="fas fa-infinity"></i>
+                <span>Unlimited daily chats</span>
+            </li>
+            <li>
+                <i class="fas fa-search"></i>
+                <span>Extended discovery radius (10 miles)</span>
+            </li>
+            <li>
+                <i class="fas fa-eye"></i>
+                <span>See who viewed your profile</span>
+            </li>
+            <li>
+                <i class="fas fa-ban"></i>
+                <span>Ad-free experience</span>
+            </li>
+            <li>
+                <i class="fas fa-crown"></i>
+                <span>Premium profile badge</span>
+            </li>
+            <li>
+                <i class="fas fa-chart-line"></i>
+                <span>Advanced analytics</span>
+            </li>
+        </ul>
+
+        {% if user.is_premium %}
+            <div class="current-plan">
+                <i class="fas fa-check-circle"></i>
+                <strong>You are currently on Premium!</strong>
+                <p>Your subscription is active and all premium features are unlocked.</p>
+            </div>
+        {% else %}
+            <button id="subscribe-btn" class="subscribe-btn">
+                <span class="btn-text">Upgrade to Premium</span>
+                <span class="loading">Processing...</span>
+            </button>
+            <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                Cancel anytime. No commitment required.
+            </p>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 3rem; opacity: 0.8;">
+        <h3>Why Premium?</h3>
+        <p>Join thousands of walkers who have upgraded to enjoy a better walking buddy experience.</p>
+    </div>
+</div>
+
+<script>
+const stripe = Stripe('{{ stripe_publishable_key }}');
+const subscribeBtn = document.getElementById('subscribe-btn');
+
+if (subscribeBtn) {
+    subscribeBtn.addEventListener('click', async function() {
+        const btnText = subscribeBtn.querySelector('.btn-text');
+        const loading = subscribeBtn.querySelector('.loading');
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        loading.classList.add('show');
+        subscribeBtn.disabled = true;
+        
+        try {
+            // Create checkout session
+            const response = await fetch('/api/subscribe/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.checkout_url) {
+                // Redirect to Stripe checkout
+                window.location.href = data.checkout_url;
+            } else {
+                throw new Error(data.error || 'Failed to create checkout session');
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to start checkout process. Please try again.');
+            
+            // Reset button state
+            btnText.style.display = 'inline';
+            loading.classList.remove('show');
+            subscribeBtn.disabled = false;
+        }
+    });
+}
+
+// Check for success/cancel parameters
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('success') === 'true') {
+    alert('🎉 Welcome to Premium! Your subscription is now active.');
+} else if (urlParams.get('canceled') === 'true') {
+    alert('Subscription was canceled. You can try again anytime!');
+}
+</script>
+{% endblock %} 

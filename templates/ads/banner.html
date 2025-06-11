@@ -1,0 +1,29 @@
+{% load static %}
+
+<div class="ad-banner" data-placement="{{ placement }}" data-ad-id="{{ ad.id }}">
+    <div class="ad-content">
+        <div class="ad-image">
+            <img src="{{ ad.image_url }}" alt="{{ ad.title }}" loading="lazy">
+        </div>
+        <div class="ad-text">
+            <h4>{{ ad.title }}</h4>
+            <p>{{ ad.description }}</p>
+            <a href="{{ ad.link_url }}" class="ad-cta" onclick="trackAdEvent('click', '{{ placement }}', '{{ ad.id }}')">
+                {{ ad.cta }}
+            </a>
+        </div>
+    </div>
+    <button class="ad-close" onclick="this.parentElement.remove()" aria-label="Close advertisement">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<script>
+    // Track ad impression
+    document.addEventListener('DOMContentLoaded', function() {
+        const adBanner = document.querySelector('[data-ad-id="{{ ad.id }}"]');
+        if (adBanner) {
+            trackAdEvent('impression', '{{ placement }}', '{{ ad.id }}');
+        }
+    });
+</script> 
