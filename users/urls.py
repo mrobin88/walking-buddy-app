@@ -9,6 +9,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('check-auth/', views.check_auth, name='check_auth'),
+    path('debug-token/', views.debug_token, name='debug_token'),
     
     # Profile and user data
     path('profile/', views.profile, name='profile'),

@@ -23,5 +23,7 @@ if [ "$RAILWAY_ENVIRONMENT" = "production" ]; then
     gunicorn django_walking_buddy.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
 else
     echo "🔧 Starting development server..."
-    python manage.py runserver 0.0.0.0:$PORT
+    cd walking-buddy-app
+    .\venv\Scripts\Activate.ps1
+    python manage.py runserver
 fi 

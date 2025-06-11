@@ -30,7 +30,7 @@ services:
     environment:
       - POSTGRES_DB=walking_buddy
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - DB_PASSWORD=password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -78,4 +78,4 @@ volumes:
   postgres_data:
   redis_data:
   static_volume:
-  media_volume: 
+  media_volume:

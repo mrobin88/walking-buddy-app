@@ -16,7 +16,19 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-produc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+# Allow any ngrok domain for development
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+
+# Add ngrok domains dynamically for development
+if DEBUG:
+    ALLOWED_HOSTS.extend([
+        '.ngrok-free.app',
+        '.ngrok.io',
+        '.ngrok.app',
+        '*.ngrok-free.app',
+        '*.ngrok.io',
+        '*.ngrok.app'
+    ])
 
 # Application definition
 INSTALLED_APPS = [
@@ -47,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'users.middleware.CSRFExemptionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -190,6 +203,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.io",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

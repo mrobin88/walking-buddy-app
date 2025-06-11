@@ -458,10 +458,17 @@
     });
 
     function initializeMap() {
-      map = L.map('map').setView([51.505, -0.09], 13);
+      // Initialize map with a default location (will be updated when user shares location)
+      map = L.map('map').setView([40.7128, -74.0060], 10); // Default to NYC
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
+      
+      // Add a message to the map
+      L.popup()
+        .setLatLng([40.7128, -74.0060])
+        .setContent('Click "Share My Location" to see your position on the map')
+        .openOn(map);
     }
 
     async function checkAuth() {
@@ -563,86 +570,167 @@
     });
 
     async function shareLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async function(position) {
-          const { latitude, longitude } = position.coords;
-          
-          try {
-            const response = await fetch('/api/auth/update-location/', {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-              },
-              body: JSON.stringify({ latitude, longitude }),
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              // Add user marker to map
-              clearUserMarkers();
-              const userMarker = L.marker([latitude, longitude])
-                .addTo(map)
-                .bindPopup('You are here!')
-                .openPopup();
-              userMarkers.push(userMarker);
-              
-              map.setView([latitude, longitude], 15);
-              showSuccess('Location shared successfully!');
-            } else {
-              showError('Failed to share location');
-            }
-          } catch (error) {
-            showError('Network error. Please try again.');
-          }
-        }, function(error) {
-          showError('Unable to get your location. Please enable location services.');
-        });
-      } else {
+      if (!navigator.geolocation) {
         showError('Geolocation is not supported by this browser.');
+        return;
+      }
+
+      // Show loading state
+      const shareButton = document.querySelector('button[onclick="shareLocation()"]');
+      const originalText = shareButton.textContent;
+      shareButton.textContent = 'Getting location...';
+      shareButton.disabled = true;
+
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+        console.log('Got location:', { latitude, longitude });
+        
+        // Send location to server
+        const response = await fetch('/api/auth/update-location/', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ latitude, longitude }),
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          // Clear existing markers
+          clearUserMarkers();
+          
+          // Add user marker to map
+          const userMarker = L.marker([latitude, longitude])
+            .addTo(map)
+            .bindPopup('You are here!')
+            .openPopup();
+          userMarkers.push(userMarker);
+          
+          // Center map on user location
+          map.setView([latitude, longitude], 15);
+          
+          showSuccess('Location shared successfully!');
+          console.log('Location updated on server');
+        } else {
+          const errorData = await response.json();
+          showError(errorData.error || 'Failed to share location');
+        }
+      } catch (error) {
+        console.error('Location error:', error);
+        if (error.code === 1) {
+          showError('Location access denied. Please enable location services in your browser.');
+        } else if (error.code === 2) {
+          showError('Location unavailable. Please check your device settings.');
+        } else if (error.code === 3) {
+          showError('Location request timed out. Please try again.');
+        } else {
+          showError('Unable to get your location. Please try again.');
+        }
+      } finally {
+        // Reset button state
+        shareButton.textContent = originalText;
+        shareButton.disabled = false;
       }
     }
 
     async function findNearbyUsers() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async function(position) {
-          const { latitude, longitude } = position.coords;
-          
-          try {
-            const response = await fetch(`/api/auth/nearby-users/?lat=${latitude}&lon=${longitude}&radius=5`, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-              },
-              credentials: 'include'
-            });
-            
-            if (response.ok) {
-              const users = await response.json();
-              displayNearbyUsers(users);
-              
-              // Add markers to map
-              clearUserMarkers();
-              users.forEach(user => {
-                if (user.latitude && user.longitude) {
-                  const marker = L.marker([user.latitude, user.longitude])
-                    .addTo(map)
-                    .bindPopup(`${user.username}<br>${user.bio || 'No bio'}`);
-                  userMarkers.push(marker);
-                }
-              });
-              
-              map.setView([latitude, longitude], 12);
-            } else {
-              showError('Failed to find nearby users');
-            }
-          } catch (error) {
-            showError('Network error. Please try again.');
-          }
-        }, function(error) {
-          showError('Unable to get your location. Please enable location services.');
-        });
-      } else {
+      if (!navigator.geolocation) {
         showError('Geolocation is not supported by this browser.');
+        return;
+      }
+
+      // Show loading state
+      const findButton = document.querySelector('button[onclick="findNearbyUsers()"]');
+      const originalText = findButton.textContent;
+      findButton.textContent = 'Finding users...';
+      findButton.disabled = true;
+
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+        console.log('Finding nearby users at:', { latitude, longitude });
+        
+        const response = await fetch(`/api/auth/nearby-users/?lat=${latitude}&lon=${longitude}&radius=5`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const users = await response.json();
+          console.log('Found nearby users:', users);
+          displayNearbyUsers(users);
+          
+          // Add markers to map
+          clearUserMarkers();
+          
+          // Add user's own marker
+          const userMarker = L.marker([latitude, longitude])
+            .addTo(map)
+            .bindPopup('You are here!')
+            .openPopup();
+          userMarkers.push(userMarker);
+          
+          // Add markers for nearby users
+          users.forEach(user => {
+            if (user.latitude && user.longitude) {
+              const marker = L.marker([user.latitude, user.longitude])
+                .addTo(map)
+                .bindPopup(`${user.username}<br>${user.bio || 'No bio'}<br>Distance: ${user.distance}km`);
+              userMarkers.push(marker);
+            }
+          });
+          
+          // Center map to show all users
+          if (users.length > 0) {
+            const bounds = L.latLngBounds([[latitude, longitude]]);
+            users.forEach(user => {
+              if (user.latitude && user.longitude) {
+                bounds.extend([user.latitude, user.longitude]);
+              }
+            });
+            map.fitBounds(bounds, { padding: [20, 20] });
+          } else {
+            map.setView([latitude, longitude], 12);
+          }
+          
+          showSuccess(`Found ${users.length} nearby users!`);
+        } else {
+          const errorData = await response.json();
+          showError(errorData.error || 'Failed to find nearby users');
+        }
+      } catch (error) {
+        console.error('Find nearby users error:', error);
+        if (error.code === 1) {
+          showError('Location access denied. Please enable location services in your browser.');
+        } else if (error.code === 2) {
+          showError('Location unavailable. Please check your device settings.');
+        } else if (error.code === 3) {
+          showError('Location request timed out. Please try again.');
+        } else {
+          showError('Network error. Please try again.');
+        }
+      } finally {
+        // Reset button state
+        findButton.textContent = originalText;
+        findButton.disabled = false;
       }
     }
 

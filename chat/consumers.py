@@ -1,9 +1,10 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import DirectMessage
+from .models import DirectMessage, ChatSession
 from users.models import User
 from django.utils import timezone
+import asyncio
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -27,6 +28,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         # Update user online status
         await self.update_user_status(True)
+        
+        # Send connection confirmation
+        await self.send(text_data=json.dumps({
+            'type': 'connection_established',
+            'user_id': self.user.id,
+            'username': self.user.username
+        }))
     
     async def disconnect(self, close_code):
         # Update user offline status
@@ -45,6 +53,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_chat_message(data)
         elif message_type == 'typing':
             await self.handle_typing(data)
+        elif message_type == 'session_keepalive':
+            await self.handle_keepalive(data)
+        elif message_type == 'mark_read':
+            await self.handle_mark_read(data)
     
     async def handle_chat_message(self, data):
         recipient_id = data.get('recipient_id')
@@ -53,8 +65,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not recipient_id or not message_text:
             return
         
-        # Save message to database
-        message = await self.save_message(recipient_id, message_text)
+        # Save message to database and create/update session
+        message = await self.save_message_and_session(recipient_id, message_text)
         
         if message:
             # Send message to recipient
@@ -94,6 +106,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
     
+    async def handle_keepalive(self, data):
+        """Handle session keepalive to maintain connection"""
+        await self.send(text_data=json.dumps({
+            'type': 'keepalive_response',
+            'timestamp': timezone.now().isoformat()
+        }))
+    
+    async def handle_mark_read(self, data):
+        """Mark messages as read"""
+        sender_id = data.get('sender_id')
+        if sender_id:
+            await self.mark_messages_read(sender_id)
+    
     async def chat_message(self, event):
         """Send chat message to WebSocket."""
         await self.send(text_data=json.dumps({
@@ -115,10 +140,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
     
     @database_sync_to_async
-    def save_message(self, recipient_id, message_text):
-        """Save message to database."""
+    def save_message_and_session(self, recipient_id, message_text):
+        """Save message to database and create/update chat session."""
         try:
             recipient = User.objects.get(id=recipient_id)
+            
+            # Create or update chat session
+            ChatSession.get_or_create_session(self.user, recipient)
+            
+            # Save message
             message = DirectMessage.objects.create(
                 sender=self.user,
                 recipient=recipient,
@@ -127,6 +157,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return message
         except User.DoesNotExist:
             return None
+    
+    @database_sync_to_async
+    def mark_messages_read(self, sender_id):
+        """Mark messages from a specific sender as read."""
+        DirectMessage.objects.filter(
+            sender_id=sender_id,
+            recipient=self.user,
+            read=False
+        ).update(read=True)
     
     @database_sync_to_async
     def update_user_status(self, is_online):

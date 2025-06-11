@@ -1,7 +1,8 @@
 from rest_framework import status, generics, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.authentication import SessionAuthentication
 from django.contrib.auth import login, logout, authenticate
 from django.shortcuts import get_object_or_404
 from .models import User, Friendship
@@ -20,6 +21,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from datetime import timedelta
+from django.utils.decorators import method_decorator
+
+# Custom authentication class that bypasses CSRF
+class CSRFExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return  # To not perform the csrf check previously happening
 
 # Initialize Stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -88,6 +95,7 @@ def logout_view(request):
 
 
 @api_view(['GET', 'PUT'])
+@authentication_classes([CSRFExemptSessionAuthentication])
 @permission_classes([permissions.IsAuthenticated])
 def profile(request):
     """Get or update user profile."""
@@ -128,12 +136,13 @@ def stats(request):
     return Response(serializer.data)
 
 
-@api_view(['POST'])
+@api_view(['POST', 'PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def update_location(request):
     """Update user location."""
-    latitude = request.data.get('latitude')
-    longitude = request.data.get('longitude')
+    # Accept both latitude/longitude and lat/lon field names
+    latitude = request.data.get('latitude') or request.data.get('lat')
+    longitude = request.data.get('longitude') or request.data.get('lon')
     
     if latitude is None or longitude is None:
         return Response(
@@ -150,7 +159,13 @@ def update_location(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Update user location
     request.user.update_location(latitude, longitude)
+    
+    # Also update online status
+    request.user.is_online = True
+    request.user.save(update_fields=['is_online', 'last_active'])
+    
     serializer = UserProfileSerializer(request.user)
     return Response(serializer.data)
 
@@ -159,6 +174,10 @@ def update_location(request):
 @permission_classes([permissions.IsAuthenticated])
 def check_auth(request):
     """Check if user is authenticated and return user info."""
+    # Debug: Check if user is authenticated
+    print(f"Check auth - User authenticated: {request.user.is_authenticated}")
+    print(f"Check auth - User: {request.user.username if request.user.is_authenticated else 'Anonymous'}")
+    
     serializer = UserProfileSerializer(request.user)
     return Response(serializer.data)
 
@@ -244,14 +263,29 @@ def list_friend_requests(request):
 
 
 @api_view(['PUT'])
+@authentication_classes([CSRFExemptSessionAuthentication])
 @permission_classes([permissions.IsAuthenticated])
 def update_profile(request):
     """Update user profile information."""
+    # Debug: Check if user is authenticated
+    print(f"=== UPDATE PROFILE DEBUG ===")
+    print(f"User authenticated: {request.user.is_authenticated}")
+    print(f"User: {request.user.username if request.user.is_authenticated else 'Anonymous'}")
+    print(f"Request method: {request.method}")
+    print(f"Request path: {request.path}")
+    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request data: {request.data}")
+    print(f"==========================")
+    
     serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
+        print(f"Serializer is valid, saving...")
         serializer.save()
+        print(f"Profile updated successfully!")
         return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        print(f"Serializer errors: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -488,4 +522,54 @@ def subscription_status(request):
             'can_hide_ads': profile.can_hide_ads,
             'extended_discovery_radius': profile.extended_discovery_radius,
         }
-    }) 
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def debug_token(request):
+    """Debug endpoint to check token validation."""
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    print(f"Auth header: {auth_header}")
+    
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        print(f"Token: {token[:20]}...")
+        
+        try:
+            from rest_framework_simplejwt.tokens import AccessToken
+            from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+            
+            # Try to validate token
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            print(f"Token valid, user_id: {user_id}")
+            
+            # Get user
+            user = User.objects.get(id=user_id)
+            print(f"User found: {user.username}")
+            
+            return Response({
+                'valid': True,
+                'user_id': user_id,
+                'username': user.username
+            })
+            
+        except (InvalidToken, TokenError) as e:
+            print(f"Token invalid: {e}")
+            return Response({
+                'valid': False,
+                'error': str(e)
+            })
+        except User.DoesNotExist:
+            print("User not found")
+            return Response({
+                'valid': False,
+                'error': 'User not found'
+            })
+    else:
+        print("No Bearer token found")
+        return Response({
+            'valid': False,
+            'error': 'No Bearer token'
+        }) 
