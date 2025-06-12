@@ -6,10 +6,6 @@ from channels.db import database_sync_to_async
 from urllib.parse import parse_qs
 
 class JWTAuthMiddleware(BaseMiddleware):
-    @property
-    def User(self):
-        return get_user_model()
-
     async def __call__(self, scope, receive, send):
         query_string = scope.get('query_string', b'').decode()
         query_params = parse_qs(query_string)
@@ -42,11 +38,13 @@ class JWTAuthMiddleware(BaseMiddleware):
 
     @database_sync_to_async
     def get_user(self, user_id):
+        User = get_user_model()
         try:
-            return self.User.objects.get(id=user_id)
-        except self.User.DoesNotExist:
+            return User.objects.get(id=user_id)
+        except User.DoesNotExist:
             return None
 
     @database_sync_to_async
     def get_anonymous_user(self):
-        return self.User.objects.get_or_create(username='anonymous')[0]
+        User = get_user_model()
+        return User.objects.get_or_create(username='anonymous')[0]
