@@ -68,7 +68,7 @@ jobs:
         python manage.py test --verbosity=2 --parallel
     
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results
@@ -109,7 +109,7 @@ jobs:
         python manage.py collectstatic --noinput
     
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-files
         path: |
@@ -135,4 +135,4 @@ jobs:
       run: |
         echo "Deploying preview to Railway..."
         # Add Railway CLI commands here when you set up Railway
-        echo "Preview deployment completed" 
+        echo "Preview deployment completed"
