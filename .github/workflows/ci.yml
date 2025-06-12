@@ -58,15 +58,11 @@ jobs:
         bandit -r . -f json -o bandit-report.json || true
         safety check --json --output safety-report.json || true
     
-    - name: Run tests
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        SECRET_KEY: test-secret-key-for-ci
-        DEBUG: True
+    - name: Ensure security reports exist
       run: |
-        python manage.py collectstatic --noinput
-        python manage.py test --verbosity=2 --parallel
-    
+        [ -f bandit-report.json ] || echo '{}' > bandit-report.json
+        [ -f safety-report.json ] || echo '{}' > safety-report.json
+
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
@@ -75,6 +71,15 @@ jobs:
         path: |
           bandit-report.json
           safety-report.json
+    
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        SECRET_KEY: test-secret-key-for-ci
+        DEBUG: True
+      run: |
+        python manage.py collectstatic --noinput
+        python manage.py test --verbosity=2 --parallel
     
     - name: Check database migrations
       env:
