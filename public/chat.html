@@ -65,81 +65,132 @@
 
     .sidebar {
       width: 300px;
+      background: #fff;
+      padding: 20px;
       border-right: 1px solid #eee;
-      display: flex;
-      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
     }
 
     .sidebar-header {
-      padding: 20px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
       border-bottom: 1px solid #eee;
-      background: #f8f9fa;
     }
 
-    .sidebar-header h3 {
+    .sidebar-header h2 {
+      margin-bottom: 10px;
+      font-size: 1.5rem;
+    }
+
+    .search-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .search-container input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .search-container button {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .search-container button:hover {
+      background: #45a049;
+    }
+
+    .online-users-section {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 20px;
+    }
+
+    .online-users-section h3 {
       margin-bottom: 10px;
       color: #333;
     }
 
-    .user-list {
-      flex: 1;
-      overflow-y: auto;
+    .online-users-section ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .online-user {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .online-user:hover {
+      background-color: #f5f5f5;
+    }
+
+    .user-name {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .user-status {
+      color: #4CAF50;
+      font-size: 0.9rem;
+    }
+
+    .user-list {
+      list-style: none;
+      padding: 0;
     }
 
     .user-item {
-      display: flex;
-      align-items: center;
       padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 5px;
+      border-bottom: 1px solid #eee;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background-color 0.3s;
     }
 
     .user-item:hover {
-      background: #f8f9fa;
+      background-color: #f5f5f5;
     }
 
     .user-item.active {
-      background: #e3f2fd;
-      border-left: 3px solid #2196f3;
+      background-color: #e3f2fd;
     }
 
-    .user-avatar {
+    .user-item img {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: #667eea;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      margin-right: 12px;
+      margin-right: 10px;
     }
 
     .user-info {
-      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .user-name {
       font-weight: bold;
-      color: #333;
-      margin-bottom: 2px;
     }
 
     .user-status {
-      font-size: 12px;
+      font-size: 0.8rem;
       color: #666;
-    }
-
-    .status-online {
-      color: #4caf50;
-    }
-
-    .status-offline {
-      color: #f44336;
     }
 
     .chat-main {
@@ -151,16 +202,28 @@
     .chat-header {
       padding: 20px;
       border-bottom: 1px solid #eee;
-      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chat-header img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .chat-header-info {
+      flex: 1;
     }
 
     .chat-header h3 {
-      color: #333;
-      margin-bottom: 5px;
+      margin: 0;
+      font-size: 1.2rem;
     }
 
-    .chat-status {
-      font-size: 14px;
+    .chat-header .user-status {
+      font-size: 0.8rem;
       color: #666;
     }
 
@@ -168,126 +231,162 @@
       flex: 1;
       padding: 20px;
       overflow-y: auto;
-      background: #fafafa;
+      background: #f5f5f5;
     }
 
     .message {
       margin-bottom: 15px;
-      display: flex;
-      align-items: flex-start;
+      max-width: 80%;
     }
 
-    .message.own {
-      flex-direction: row-reverse;
-    }
-
-    .message-avatar {
-      width: 35px;
-      height: 35px;
-      border-radius: 50%;
-      background: #667eea;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .message.sent {
+      margin-left: auto;
+      background: #4CAF50;
       color: white;
-      font-weight: bold;
-      font-size: 12px;
-      margin: 0 10px;
+    }
+
+    .message.received {
+      background: #e0e0e0;
     }
 
     .message-content {
-      max-width: 60%;
-      background: white;
-      padding: 12px 16px;
-      border-radius: 18px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      position: relative;
+      padding: 10px 15px;
+      border-radius: 15px;
+      word-wrap: break-word;
     }
 
-    .message.own .message-content {
-      background: #667eea;
-      color: white;
-    }
-
-    .message-text {
-      margin-bottom: 5px;
-      line-height: 1.4;
-    }
-
-    .message-time {
-      font-size: 11px;
-      color: #999;
-      text-align: right;
-    }
-
-    .message.own .message-time {
-      color: rgba(255,255,255,0.7);
+    .message-timestamp {
+      font-size: 0.7rem;
+      color: #666;
+      margin-top: 5px;
     }
 
     .chat-input-container {
       padding: 20px;
       border-top: 1px solid #eee;
-      background: white;
     }
 
     .chat-input-wrapper {
       display: flex;
       gap: 10px;
-      align-items: flex-end;
     }
 
     .chat-input {
       flex: 1;
-      padding: 12px 16px;
+      padding: 10px;
       border: 1px solid #ddd;
-      border-radius: 25px;
-      font-size: 14px;
+      border-radius: 4px;
       resize: none;
-      max-height: 100px;
-      min-height: 45px;
-    }
-
-    .chat-input:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+      min-height: 40px;
+      font-size: 14px;
     }
 
     .send-btn {
-      padding: 12px 20px;
-      background: #667eea;
+      padding: 10px 20px;
+      background: #4CAF50;
       color: white;
       border: none;
-      border-radius: 25px;
+      border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
-      transition: background 0.3s;
     }
 
     .send-btn:hover {
-      background: #5a6fd8;
-    }
-
-    .send-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
+      background: #45a049;
     }
 
     .no-chat-selected {
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100%;
       color: #666;
-      font-size: 18px;
-      text-align: center;
+    }
+
+    .no-chat-selected h3 {
+      margin: 0;
+      color: #333;
+    }
+
+    .no-chat-selected p {
+      margin: 10px 0 0;
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      color: #666;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     .typing-indicator {
-      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
       color: #666;
-      font-style: italic;
-      font-size: 14px;
+      font-size: 0.8rem;
+    }
+
+    .typing-dots {
+      display: inline-flex;
+      gap: 2px;
+    }
+
+    .typing-dot {
+      width: 4px;
+      height: 4px;
+      background: #3498db;
+      border-radius: 50%;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: 0s; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 100% { transform: translateY(0); opacity: 0.5; }
+      50% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    .message-image {
+      max-width: 200px;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .message-image-container {
+      text-align: center;
+    }
+
+    .message-image-container.sent {
+      margin-left: auto;
+    }
+
+    .message-image-container.received {
+      margin-right: auto;
+    }
+
+    .message-image-caption {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 5px;
     }
 
     .login-prompt {
@@ -351,9 +450,15 @@
   <div id="loginView" class="login-prompt">
     <div class="login-container">
       <h2>Walking Buddy Chat</h2>
-      <p>Enter your username to start chatting!</p>
-      <input type="text" id="usernameInput" placeholder="Enter your username..." maxlength="20" />
-      <button onclick="login()">Start Chatting</button>
+      <div class="login-form">
+        <input type="text" id="usernameInput" placeholder="Username" required />
+        <input type="password" id="passwordInput" placeholder="Password" required />
+        <input type="password" id="confirmPasswordInput" placeholder="Confirm Password" required />
+        <div class="login-actions">
+          <button onclick="register()" class="register-btn">Register</button>
+          <button onclick="login()" class="login-btn">Login</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -363,9 +468,9 @@
       <h1>Walking Buddy Chat</h1>
       <p>Connect with other walkers in real-time</p>
       <div class="nav-buttons">
-        <a href="/" class="nav-btn">🏠 Main App</a>
-        <a href="/chat" class="nav-btn active">💬 Chat</a>
-        <a href="/admin" class="nav-btn">⚙️ Admin</a>
+        <a href="/" class="nav-btn"> Main App</a>
+        <a href="/chat" class="nav-btn active"> Chat</a>
+        <a href="/admin" class="nav-btn"> Admin</a>
       </div>
     </div>
 
@@ -379,7 +484,6 @@
         <div class="user-list" id="userList">
           <div style="text-align: center; padding: 20px; color: #666;">
             Loading users...
-          </div>
         </div>
       </div>
 
@@ -397,7 +501,7 @@
         <div class="messages-container" id="messagesContainer">
           <div class="no-chat-selected">
             <div>
-              <h3>💬</h3>
+              <h3></h3>
               <p>Choose someone to chat with</p>
             </div>
           </div>
@@ -419,40 +523,250 @@
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    let ws = null;
     let currentUser = null;
     let selectedChatUser = null;
     let connectedUsers = [];
     let messages = {};
 
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     // Initialize chat
     document.addEventListener('DOMContentLoaded', function() {
-      // Auto-resize textarea
-      const chatInput = document.getElementById('chatInput');
-      if (chatInput) {
-        chatInput.addEventListener('input', function() {
-          this.style.height = 'auto';
-          this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-        });
-      }
+        // Auto-resize textarea
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            });
+        }
+
+        // Initialize WebSocket with auth
+        initializeWebSocket();
     });
 
-    // Login function
-    function login() {
-      const username = document.getElementById('usernameInput').value.trim();
-      if (!username) {
-        alert('Please enter a username');
-        return;
-      }
+    // Initialize WebSocket connection
+    function initializeWebSocket() {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+            // Create WebSocket URL with token
+            const wsUrl = `ws://${window.location.host}/ws/chat/${currentUser.id}/?token=${accessToken}`;
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                loadUsers();
+                updateOnlineStatus(true);
+                refreshOnlineUsers();
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateOnlineStatus(false);
+                // Attempt to reconnect after 2 seconds
+                setTimeout(initializeWebSocket, 2000);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                if (error.message === 'invalid_token') {
+                    alert('Your session has expired. Please log in again.');
+                    window.location.href = '/login/';
+                }
+            };
+            
+            // Handle incoming messages
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'message') {
+                    addMessage(data.message, data.sender_id !== currentUser.id);
+                } else if (data.type === 'status') {
+                    updateOnlineStatus(data.isOnline);
+                }
+            };
+        }
+    }
 
-      socket.emit('user_login', { username });
+    // Update user's online status
+    function updateOnlineStatus(isOnline) {
+        if (currentUser && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'status',
+                isOnline: isOnline
+            }));
+        }
+    }
+
+    // Refresh online users list
+    function refreshOnlineUsers() {
+        fetch('/api/users/online-users/')
+            .then(response => response.json())
+            .then(data => {
+                const onlineUsers = data.filter(user => user.id !== currentUser.id);
+                const onlineUsersList = document.getElementById('onlineUsersList');
+                if (onlineUsersList) {
+                    onlineUsersList.innerHTML = onlineUsers.map(user => `
+                        <li class="online-user">
+                            <div class="user-info">
+                                <span class="user-name">${user.username}</span>
+                                <span class="user-status">Online</span>
+                            </div>
+                            <button onclick="selectUser(${user.id})" class="select-user-btn">Chat</button>
+                        </li>
+                    `).join('');
+                }
+            })
+            .catch(error => console.error('Error fetching online users:', error));
+    }
+
+    // Login function
+    async function login() {
+        const username = document.getElementById('usernameInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        
+        if (!username || !password) {
+            alert('Please enter both username and password');
+            return;
+        }
+
+        try {
+            // First request to get CSRF token
+            const csrfResponse = await fetch('/api/auth/login/', {
+                method: 'HEAD',
+                credentials: 'include'
+            });
+            const csrfToken = csrfResponse.headers.get('X-CSRFToken');
+
+            // Second request with actual login
+            const response = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken || getCookie('csrftoken')
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Login failed');
+            }
+
+            const data = await response.json();
+            
+            // Save tokens
+            localStorage.setItem('refresh_token', data.refresh);
+            localStorage.setItem('access_token', data.access);
+            
+            // Update UI
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('chatView').style.display = 'block';
+            
+            // Initialize socket with token
+            initializeSocket();
+            
+        } catch (error) {
+            alert('Login failed. Please try again.');
+            console.error('Login error:', error);
+        }
+    }
+
+    // Register function
+    async function register() {
+        const username = document.getElementById('usernameInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        const confirmPassword = document.getElementById('confirmPasswordInput').value.trim();
+        
+        if (!username || !password || !confirmPassword) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/register/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Registration failed');
+            }
+
+            const data = await response.json();
+            
+            // Save tokens
+            localStorage.setItem('refresh_token', data.refresh);
+            localStorage.setItem('access_token', data.access);
+            
+            // Update UI
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('chatView').style.display = 'block';
+            
+            // Initialize socket with token
+            initializeSocket();
+            
+        } catch (error) {
+            alert('Registration failed. Please try again.');
+            console.error('Registration error:', error);
+        }
+    }
+
+    // Load users from API
+    async function loadUsers() {
+        try {
+            const response = await fetch('/api/auth/users/', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load users');
+            }
+
+            const users = await response.json();
+            updateUserList(users);
+        } catch (error) {
+            console.error('Error loading users:', error);
+        }
     }
 
     // Handle login success
     socket.on('login_success', function(data) {
       currentUser = data.user;
+      // Update UI
       document.getElementById('loginView').style.display = 'none';
       document.getElementById('chatView').style.display = 'flex';
       

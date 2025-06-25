@@ -26,7 +26,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         await self.accept()
         
-        # Update user online status
+        # Update user online status and location
         await self.update_user_status(True)
         
         # Send connection confirmation
@@ -40,6 +40,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Update user offline status
         await self.update_user_status(False)
         
+        # Remove user from group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name

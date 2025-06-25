@@ -2,7 +2,15 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
+from django.utils import timezone
+from django.db.models import JSONField
 
+# Premium subscription plans
+SUBSCRIPTION_PLANS = [
+    ('basic', 'Basic'),
+    ('premium', 'Premium'),
+    ('business', 'Business')
+]
 
 class User(AbstractUser):
     """Custom user model with extended profile and statistics."""
@@ -60,6 +68,17 @@ class User(AbstractUser):
     # UUID for public identification
     public_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     
+    # Premium features
+    subscription_plan = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_PLANS,
+        default='basic'
+    )
+    subscription_expiry = models.DateTimeField(null=True, blank=True)
+    is_premium = models.BooleanField(default=False)
+    daily_chats_used = models.IntegerField(default=0)
+    max_daily_chats = models.IntegerField(default=10)
+
     class Meta:
         db_table = 'users'
         verbose_name = 'User'
@@ -74,15 +93,17 @@ class User(AbstractUser):
         return f"{self.first_name} {self.last_name}".strip() or self.username
     
     @property
-    def is_premium(self):
+    def has_premium(self):
         """Check if user has premium subscription."""
-        return hasattr(self, 'profile') and self.profile.is_premium
+        return self.subscription_plan == 'premium' and (self.subscription_expiry is None or self.subscription_expiry > timezone.now())
     
     def update_location(self, latitude, longitude):
-        """Update user's location."""
+        """Update user's location and online status."""
         self.latitude = latitude
         self.longitude = longitude
-        self.save(update_fields=['latitude', 'longitude', 'location_updated'])
+        self.is_online = True
+        self.last_active = timezone.now()
+        self.save(update_fields=['latitude', 'longitude', 'location_updated', 'is_online', 'last_active'])
     
     def update_walk_stats(self, distance, duration, rating=None):
         """Update user's walking statistics."""

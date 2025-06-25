@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,7 +24,7 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       padding: 15px 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .header h1 {
@@ -37,7 +38,7 @@
 
     .nav-btn {
       padding: 8px 16px;
-      background: rgba(255,255,255,0.2);
+      background: rgba(255, 255, 255, 0.2);
       color: white;
       text-decoration: none;
       border-radius: 5px;
@@ -46,11 +47,11 @@
     }
 
     .nav-btn:hover {
-      background: rgba(255,255,255,0.3);
+      background: rgba(255, 255, 255, 0.3);
     }
 
     .nav-btn.active {
-      background: rgba(255,255,255,0.4);
+      background: rgba(255, 255, 255, 0.4);
     }
 
     .chat-container {
@@ -60,7 +61,7 @@
       margin: 0 auto;
       width: 100%;
       background: white;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
     .sidebar {
@@ -200,7 +201,7 @@
       background: white;
       padding: 12px 16px;
       border-radius: 18px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       position: relative;
     }
 
@@ -221,7 +222,7 @@
     }
 
     .message.own .message-time {
-      color: rgba(255,255,255,0.7);
+      color: rgba(255, 255, 255, 0.7);
     }
 
     .chat-input-container {
@@ -302,7 +303,7 @@
       background: white;
       padding: 40px;
       border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
       text-align: center;
       max-width: 400px;
       width: 90%;
@@ -344,11 +345,81 @@
     .login-container button:hover {
       background: #5a6fd8;
     }
+
+    /* Connection status indicator */
+    .connection-status {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      padding: 8px 16px;
+      border-radius: 4px;
+      color: white;
+      font-size: 14px;
+      z-index: 1000;
+      opacity: 0.9;
+      transition: all 0.3s ease;
+    }
+
+    .connection-status.connected {
+      background-color: #4CAF50;
+    }
+
+    .connection-status.disconnected,
+    .connection-status.reconnecting {
+      background-color: #FF9800;
+    }
+
+    .connection-status.error,
+    .connection-status.failed {
+      background-color: #F44336;
+    }
+
+    /* Loading indicator */
+    .loading-indicator {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Message status indicators */
+    .message-status {
+      font-size: 12px;
+      color: #999;
+      margin-left: 8px;
+    }
+
+    .message-status.sent {
+      color: #2196F3;
+    }
+
+    .message-status.delivered {
+      color: #4CAF50;
+    }
+
+    .message-status.failed {
+      color: #F44336;
+    }
   </style>
 </head>
+
 <body>
+  <!-- Connection Status Indicator -->
+  <div id="connectionStatus" class="connection-status hidden"></div>
+
   <div class="header">
-    <h1>Walking Buddy Chat</h1>
+    <h1>Walking Buddy Chat <span id="connectionIndicator" class="connection-indicator"></span></h1>
     <p>Connect with other walkers in real-time</p>
     <div class="nav-buttons">
       <a href="/" class="nav-btn">🏠 Main App</a>
@@ -391,12 +462,8 @@
 
       <div class="chat-input-container" id="messageInput" style="display: none;">
         <div class="chat-input-wrapper">
-          <textarea 
-            class="chat-input" 
-            placeholder="Type your message..." 
-            rows="1"
-            onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
-          ></textarea>
+          <textarea class="chat-input" placeholder="Type your message..." rows="1"
+            onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
           <button class="send-btn" onclick="sendMessage()">Send</button>
         </div>
       </div>
@@ -404,58 +471,82 @@
   </div>
 
   <script>
+    // WebSocket connection state
+    let socket = null;
     let currentUser = null;
-    let accessToken = localStorage.getItem('accessToken');
-    let chatSocket = null;
-    let selectedUser = null;
+    let selectedUserId = null;
     let users = [];
+    let messageHistory = [];
+    let keepAliveInterval;
     let reconnectAttempts = 0;
-    let maxReconnectAttempts = 5;
-    let keepAliveInterval = null;
-    let messageQueue = [];
-    let isConnected = false;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 3000; // 3 seconds
+    const MESSAGE_HISTORY_LIMIT = 100; // Max messages to keep in history
+    const WS_HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
-    // Session storage keys
-    const SESSION_KEYS = {
-      CHAT_HISTORY: 'chat_history_',
-      SELECTED_USER: 'selected_user',
-      MESSAGE_DRAFTS: 'message_drafts_',
-      LAST_ACTIVITY: 'last_activity'
+    // Connection states
+    const CONNECTION_STATES = {
+      CONNECTING: 'connecting',
+      CONNECTED: 'connected',
+      DISCONNECTED: 'disconnected',
+      ERROR: 'error',
+      RECONNECTING: 'reconnecting'
+    };
+
+    // Message statuses
+    const MESSAGE_STATUS = {
+      SENDING: 'sending',
+      SENT: 'sent',
+      DELIVERED: 'delivered',
+      FAILED: 'failed'
     };
 
     // Check authentication on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      if (accessToken) {
+    document.addEventListener('DOMContentLoaded', function () {
+      if (localStorage.getItem('access_token')) {
         checkAuth();
       } else {
         window.location.href = '/';
       }
     });
 
-    // Handle page visibility changes for better session management
-    document.addEventListener('visibilitychange', function() {
+    // Handle page visibility changes
+    document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
-        // Page is hidden - save current state
         saveCurrentState();
       } else {
-        // Page is visible - restore state and reconnect if needed
         restoreState();
-        if (!isConnected) {
+        if (!socket || socket.readyState === WebSocket.CLOSED) {
           connectWebSocket();
         }
       }
     });
 
-    // Handle beforeunload to save state
-    window.addEventListener('beforeunload', function() {
+    // Save state before unload
+    window.addEventListener('beforeunload', function () {
       saveCurrentState();
     });
 
     async function checkAuth() {
+      const accessToken = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+      
+      // If no token, redirect to login
+      if (!accessToken) {
+        console.log('No access token found, redirecting to login');
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+        return;
+      }
+      
+      // If we have a token, just initialize the chat
+      // The server will reject if the token is invalid
       try {
         const response = await fetch('/api/auth/check-auth/', {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
           },
           credentials: 'include'
         });
@@ -465,6 +556,9 @@
           currentUser = data;
           initializeChat();
         } else {
+          // If token is invalid, clear it and redirect to login
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('access_token');
           window.location.href = '/';
         }
       } catch (error) {
@@ -472,157 +566,56 @@
         window.location.href = '/';
       }
     }
-
-    function initializeChat() {
-      connectWebSocket();
-      loadUsers();
-      restoreState();
-      startKeepAlive();
-    }
-
-    function connectWebSocket() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/chat/?token=${accessToken}`;
+    
+    async function refreshToken() {
+      const refreshToken = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token');
+      if (!refreshToken) return false;
       
-      chatSocket = new WebSocket(wsUrl);
-      
-      chatSocket.onopen = function(e) {
-        console.log('WebSocket connected');
-        isConnected = true;
-        reconnectAttempts = 0;
-        
-        // Send queued messages
-        while (messageQueue.length > 0) {
-          const queuedMessage = messageQueue.shift();
-          chatSocket.send(JSON.stringify(queuedMessage));
-        }
-      };
-      
-      chatSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        handleWebSocketMessage(data);
-      };
-      
-      chatSocket.onclose = function(e) {
-        console.log('WebSocket disconnected');
-        isConnected = false;
-        
-        // Try to reconnect with exponential backoff
-        if (reconnectAttempts < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-          setTimeout(() => {
-            reconnectAttempts++;
-            connectWebSocket();
-          }, delay);
-        }
-      };
-      
-      chatSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);
-      };
-    }
-
-    function handleWebSocketMessage(data) {
-      switch(data.type) {
-        case 'connection_established':
-          console.log('Connection established with server');
-          break;
-        case 'chat_message':
-          displayMessage(data);
-          saveMessageToHistory(data);
-          break;
-        case 'user_typing':
-          showTypingIndicator(data);
-          break;
-        case 'message_sent':
-          // Message was sent successfully
-          break;
-        case 'keepalive_response':
-          // Keepalive response received
-          break;
-      }
-    }
-
-    function startKeepAlive() {
-      // Send keepalive every 30 seconds
-      keepAliveInterval = setInterval(() => {
-        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-          chatSocket.send(JSON.stringify({
-            type: 'session_keepalive'
-          }));
-        }
-      }, 30000);
-    }
-
-    function saveCurrentState() {
-      if (selectedUser) {
-        // Save selected user
-        sessionStorage.setItem(SESSION_KEYS.SELECTED_USER, JSON.stringify(selectedUser));
-        
-        // Save message drafts
-        const messageInput = document.querySelector('.chat-input');
-        if (messageInput && messageInput.value.trim()) {
-          sessionStorage.setItem(SESSION_KEYS.MESSAGE_DRAFTS + selectedUser.id, messageInput.value);
-        }
-        
-        // Save last activity
-        sessionStorage.setItem(SESSION_KEYS.LAST_ACTIVITY, Date.now().toString());
-      }
-    }
-
-    function restoreState() {
       try {
-        // Restore selected user
-        const savedUser = sessionStorage.getItem(SESSION_KEYS.SELECTED_USER);
-        if (savedUser) {
-          selectedUser = JSON.parse(savedUser);
-          selectUser(selectedUser, false); // Don't reload messages immediately
-        }
+        const response = await fetch('/api/token/refresh/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: JSON.stringify({ refresh: refreshToken })
+        });
         
-        // Restore message drafts
-        if (selectedUser) {
-          const savedDraft = sessionStorage.getItem(SESSION_KEYS.MESSAGE_DRAFTS + selectedUser.id);
-          if (savedDraft) {
-            const messageInput = document.querySelector('.chat-input');
-            if (messageInput) {
-              messageInput.value = savedDraft;
-            }
-          }
+        if (response.ok) {
+          const data = await response.json();
+          // Store the new tokens
+          localStorage.setItem('accessToken', data.access);
+          localStorage.setItem('refreshToken', data.refresh);
+          localStorage.setItem('access_token', data.access);
+          localStorage.setItem('refresh_token', data.refresh);
+          return true;
         }
       } catch (error) {
-        console.error('Error restoring state:', error);
+        console.error('Token refresh failed:', error);
       }
+      
+      // If we get here, refresh failed
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+      return false;
     }
-
-    function saveMessageToHistory(data) {
-      const historyKey = SESSION_KEYS.CHAT_HISTORY + selectedUser.id;
-      let history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      
-      // Add message to history (limit to last 100 messages)
-      history.push({
-        message: data.message,
-        sender_id: data.sender_id,
-        sender_username: data.sender_username,
-        timestamp: data.timestamp,
-        message_id: data.message_id
-      });
-      
-      if (history.length > 100) {
-        history = history.slice(-100);
-      }
-      
-      localStorage.setItem(historyKey, JSON.stringify(history));
     }
 
     async function loadUsers() {
       try {
         const response = await fetch('/api/auth/nearby-users/?lat=0&lon=0&radius=50', {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           },
           credentials: 'include'
         });
-        
+
         if (response.ok) {
           users = await response.json();
           displayUsers();
@@ -635,13 +628,16 @@
     function displayUsers() {
       const userList = document.getElementById('userList');
       userList.innerHTML = '';
-      
+
       users.forEach(user => {
         if (user.id !== currentUser.id) {
           const userItem = document.createElement('div');
           userItem.className = 'user-item';
-          userItem.onclick = () => selectUser(user);
-          
+          userItem.onclick = (event) => {
+            event.preventDefault();
+            selectUser(user, true, event);
+          };
+
           userItem.innerHTML = `
             <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
             <div class="user-info">
@@ -651,72 +647,343 @@
               </div>
             </div>
           `;
-          
+
           userList.appendChild(userItem);
         }
       });
     }
 
-    function selectUser(user, loadMessages = true) {
-      selectedUser = user;
-      
+    function selectUser(user, loadMessages = true, event = null) {
+      if (!user) return;
+
+      selectedUserId = user.id;
+
       // Update UI
       document.querySelectorAll('.user-item').forEach(item => {
         item.classList.remove('active');
       });
-      event.currentTarget.classList.add('active');
-      
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+      }
+
       // Update chat header
       document.getElementById('chatUserName').textContent = user.username;
       document.getElementById('chatUserStatus').textContent = user.is_online ? 'Online' : 'Offline';
       document.getElementById('chatUserStatus').className = `chat-status ${user.is_online ? 'status-online' : 'status-offline'}`;
-      
-      // Show chat area
+
+      // Show chat input and messages container
       document.getElementById('messagesContainer').style.display = 'block';
       document.getElementById('messageInput').style.display = 'block';
-      
+
+      // Load messages
       if (loadMessages) {
-        // Load messages from server
-        loadMessages(user.id);
+        loadMessagesFromServer(user.id);
       } else {
-        // Load from local history first, then from server
         loadLocalHistory(user.id);
-        loadMessages(user.id);
+        loadMessagesFromServer(user.id);
       }
-      
-      // Mark messages as read
-      if (chatSocket && isConnected) {
-        chatSocket.send(JSON.stringify({
+
+      // Mark messages as read if socket is connected
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
           type: 'mark_read',
           sender_id: user.id
         }));
       }
     }
 
-    function loadLocalHistory(userId) {
-      const historyKey = SESSION_KEYS.CHAT_HISTORY + userId;
-      const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    function initializeChat() {
+      // Check if we have a valid user
+      if (!currentUser) {
+        console.log('No current user, checking auth...');
+        checkAuth();
+        return;
+      }
       
+      console.log('Initializing chat for user:', currentUser.username);
+      
+      // Initialize chat UI
+      loadUsers();
+      
+      // Set up event listeners
+      document.getElementById('sendButton').addEventListener('click', sendMessage);
+      
+      // Connect WebSocket
+      connectWebSocket();
+    }
+
+    function connectWebSocket() {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        console.error('No access token available');
+        updateConnectionStatus(CONNECTION_STATES.ERROR, 'Authentication required');
+        return;
+      }
+
+      // Close existing connection if any
+      if (socket) {
+        try {
+          socket.close();
+        } catch (e) {
+          console.warn('Error closing previous socket:', e);
+        }
+      }
+
+      updateConnectionStatus(CONNECTION_STATES.CONNECTING);
+
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = `${wsProtocol}${window.location.host}/ws/chat/`;
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          console.log('WebSocket connected');
+          reconnectAttempts = 0;
+          updateConnectionStatus(CONNECTION_STATES.CONNECTED);
+          startKeepAlive();
+
+          // Authenticate with the server
+          const authMessage = {
+            type: 'authenticate',
+            token: accessToken
+          };
+          socket.send(JSON.stringify(authMessage));
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+          } catch (e) {
+            console.error('Error processing WebSocket message:', e);
+          }
+        };
+
+        socket.onclose = (event) => {
+          console.log('WebSocket disconnected:', event);
+          stopKeepAlive();
+          updateConnectionStatus(CONNECTION_STATES.DISCONNECTED);
+
+          if (!event.wasClean) {
+            console.log('Connection died, attempting to reconnect...');
+            attemptReconnect();
+          }
+        };
+
+        socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          updateConnectionStatus(CONNECTION_STATES.ERROR, 'Connection error');
+        };
+
+      } catch (error) {
+        console.error('Failed to create WebSocket:', error);
+        updateConnectionStatus(CONNECTION_STATES.ERROR, 'Connection failed');
+        attemptReconnect();
+      }
+    }
+
+    function attemptReconnect() {
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        const delay = Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1), 30000); // Max 30s delay
+
+        updateConnectionStatus(
+          CONNECTION_STATES.RECONNECTING,
+          `Reconnecting in ${Math.ceil(delay / 1000)}s... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`
+        );
+
+        setTimeout(() => {
+          if (!socket || socket.readyState === WebSocket.CLOSED) {
+            connectWebSocket();
+          }
+        }, delay);
+      } else {
+        updateConnectionStatus(
+          CONNECTION_STATES.ERROR,
+          'Connection failed. Please refresh the page.'
+        );
+      }
+    }
+
+    function updateConnectionStatus(status, message = '') {
+      const statusElement = document.getElementById('connectionStatus');
+      const indicatorElement = document.getElementById('connectionIndicator');
+
+      if (!statusElement) return;
+
+      // Update status element
+      statusElement.className = `connection-status ${status}`;
+      statusElement.textContent = message || '';
+
+      // Show/hide status element
+      if (status === CONNECTION_STATES.CONNECTED) {
+        statusElement.classList.add('hidden');
+      } else {
+        statusElement.classList.remove('hidden');
+      }
+
+      // Update connection indicator
+      if (indicatorElement) {
+        indicatorElement.className = 'connection-indicator';
+        switch (status) {
+          case CONNECTION_STATES.CONNECTED:
+            indicatorElement.innerHTML = '';
+            break;
+          case CONNECTION_STATES.CONNECTING:
+          case CONNECTION_STATES.RECONNECTING:
+            indicatorElement.innerHTML = '';
+            break;
+          case CONNECTION_STATES.ERROR:
+          case CONNECTION_STATES.DISCONNECTED:
+            indicatorElement.innerHTML = '';
+            break;
+        }
+      }
+    }
+
+    function handleWebSocketMessage(data) {
+      try {
+        switch (data.type) {
+          case 'message':
+            // Update message status if it's a response to our sent message
+            if (data.tempId) {
+              updateMessageStatus(data.tempId, MESSAGE_STATUS.DELIVERED, data.id);
+            } else {
+              // This is a new incoming message
+              displayMessage({
+                ...data,
+                status: MESSAGE_STATUS.DELIVERED
+              });
+
+              // Notify user if tab is not active
+              if (document.hidden) {
+                notifyNewMessage(data);
+              }
+            }
+            break;
+
+          case 'message_delivered':
+            updateMessageStatus(data.messageId, MESSAGE_STATUS.DELIVERED);
+            break;
+
+          case 'message_read':
+            updateMessageStatus(data.messageId, MESSAGE_STATUS.READ);
+            break;
+
+          case 'typing':
+            showTypingIndicator(data);
+            break;
+
+          case 'user_status':
+            updateUserStatus(data.userId, data.status);
+            break;
+
+          case 'error':
+            console.error('Server error:', data.message);
+            showError(data.message || 'An error occurred');
+            break;
+
+          case 'pong':
+            // Update last seen time for latency calculation if needed
+            break;
+
+          default:
+            console.log('Unknown message type:', data.type);
+        }
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error, data);
+      }
+    }
+
+    function startKeepAlive() {
+      // Clear any existing interval
+      stopKeepAlive();
+
+      // Send a ping at regular intervals to keep the connection alive
+      keepAliveInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'ping',
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.error('Error sending ping:', e);
+          }
+        }
+      }, WS_HEARTBEAT_INTERVAL);
+    }
+
+    function stopKeepAlive() {
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+      }
+    }
+
+    function saveCurrentState() {
+      if (selectedUserId != null) {
+        sessionStorage.setItem('selectedUser', JSON.stringify({
+          id: selectedUserId
+        }));
+
+        const messageInput = document.querySelector('.chat-input');
+        if (messageInput && messageInput.value.trim()) {
+          sessionStorage.setItem(`messageDrafts_${selectedUserId}`, messageInput.value);
+        }
+
+        sessionStorage.setItem('lastActivity', Date.now().toString());
+      }
+    }
+
+    function restoreState() {
+      try {
+        const savedUser = sessionStorage.getItem('selectedUser');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          selectUser({
+            id: user.id
+          }, false);
+        }
+
+        if (selectedUserId != null) {
+          const savedDraft = sessionStorage.getItem(`messageDrafts_${selectedUserId}`);
+          if (savedDraft) {
+            const messageInput = document.querySelector('.chat-input');
+            if (messageInput) {
+              messageInput.value = savedDraft;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring state:', error);
+      }
+    }
+
+    function loadLocalHistory(userId) {
+      const historyKey = `chatHistory_${userId}`;
+      const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
+
       if (history.length > 0) {
         displayMessages(history);
       }
     }
 
-    async function loadMessages(userId) {
+    async function loadMessagesFromServer(userId) {
       try {
         const response = await fetch(`/api/chat/dm/list/${userId}/`, {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           },
           credentials: 'include'
         });
-        
+
         if (response.ok) {
           const messages = await response.json();
           displayMessages(messages);
-          
-          // Update local history with server data
-          const historyKey = SESSION_KEYS.CHAT_HISTORY + userId;
+
+          const historyKey = `chatHistory_${userId}`;
           localStorage.setItem(historyKey, JSON.stringify(messages));
         }
       } catch (error) {
@@ -727,70 +994,144 @@
     function displayMessages(messages) {
       const messagesContainer = document.getElementById('messagesContainer');
       messagesContainer.innerHTML = '';
-      
+
+      if (!messages || messages.length === 0) {
+        messagesContainer.innerHTML = '<p>No messages yet</p>';
+        return;
+      }
+
       messages.forEach(message => {
         displayMessage({
-          message: message.message,
-          sender_id: message.sender,
-          sender_username: message.sender_username,
-          timestamp: message.timestamp
+          ...message,
+          status: MESSAGE_STATUS.DELIVERED
         });
       });
-      
-      // Scroll to bottom
+
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     function displayMessage(data) {
-      if (!selectedUser || (data.sender_id !== selectedUser.id && data.sender_id !== currentUser.id)) {
+      if (!selectedUserId ||
+        (data.sender_id !== selectedUserId && data.sender_id !== currentUser.id)) {
         return;
       }
-      
+
       const messagesContainer = document.getElementById('messagesContainer');
       const isOwnMessage = data.sender_id === currentUser.id;
-      
+
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${isOwnMessage ? 'own' : ''}`;
-      
+
       messageDiv.innerHTML = `
         <div class="message-avatar">${data.sender_username.charAt(0).toUpperCase()}</div>
         <div class="message-content">
           <div class="message-text">${data.message}</div>
           <div class="message-time">${new Date(data.timestamp).toLocaleTimeString()}</div>
+          <div class="message-status ${data.status}">${getMessageStatusText(data.status)}</div>
         </div>
       `;
-      
+
       messagesContainer.appendChild(messageDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function getMessageStatusText(status) {
+      switch (status) {
+        case MESSAGE_STATUS.SENDING:
+          return 'Sending...';
+        case MESSAGE_STATUS.SENT:
+          return 'Sent';
+        case MESSAGE_STATUS.DELIVERED:
+          return 'Delivered';
+        case MESSAGE_STATUS.FAILED:
+          return 'Failed to send';
+        default:
+          return '';
+      }
+    }
+
+    function updateMessageStatus(tempId, status, messageId = null) {
+      const messagesContainer = document.getElementById('messagesContainer');
+      const messageElements = messagesContainer.children;
+
+      for (let i = 0; i < messageElements.length; i++) {
+        const messageElement = messageElements[i];
+        const messageData = messageElement.dataset;
+
+        if (messageData.tempId === tempId) {
+          messageElement.querySelector('.message-status').className = `message-status ${status}`;
+          messageElement.querySelector('.message-status').textContent = getMessageStatusText(status);
+
+          if (messageId) {
+            messageData.messageId = messageId;
+          }
+
+          break;
+        }
+      }
     }
 
     function sendMessage() {
       const messageInput = document.querySelector('.chat-input');
       const message = messageInput.value.trim();
-      
-      if (message && selectedUser) {
-        const messageData = {
-          type: 'chat_message',
-          recipient_id: selectedUser.id,
-          message: message
-        };
-        
-        if (chatSocket && isConnected) {
-          // Send via WebSocket
-          chatSocket.send(JSON.stringify(messageData));
-        } else {
-          // Queue message for later
-          messageQueue.push(messageData);
+
+      if (!message || !selectedUserId) return;
+
+      // Create a temporary ID for the message
+      const tempMessageId = 'temp-' + Date.now();
+      const timestamp = new Date().toISOString();
+
+      // Create message data
+      const messageData = {
+        type: 'message',
+        id: tempMessageId,
+        to: selectedUserId,
+        content: message,
+        timestamp: timestamp,
+        status: MESSAGE_STATUS.SENDING
+      };
+
+      // Add to UI immediately as "sending"
+      displayMessage(messageData);
+
+      // Clear input but keep focus
+      messageInput.value = '';
+      messageInput.focus();
+
+      // Send via WebSocket if connected
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        try {
+          // Add to local storage immediately
+          saveMessageToHistory({
+            ...messageData,
+            from: currentUser.id,
+            status: MESSAGE_STATUS.SENDING
+          });
+
+          // Send the message
+          socket.send(JSON.stringify({
+            type: 'message',
+            to: selectedUserId,
+            content: message,
+            tempId: tempMessageId
+          }));
+
+        } catch (error) {
+          console.error('Error sending message:', error);
+          updateMessageStatus(tempMessageId, MESSAGE_STATUS.FAILED);
         }
-        
-        // Clear input and remove draft
-        messageInput.value = '';
-        sessionStorage.removeItem(SESSION_KEYS.MESSAGE_DRAFTS + selectedUser.id);
+      } else {
+        console.error('WebSocket is not connected');
+        updateMessageStatus(tempMessageId, MESSAGE_STATUS.FAILED);
+        // Attempt to reconnect if disconnected
+        if (!socket || socket.readyState === WebSocket.CLOSED) {
+          connectWebSocket();
+        }
       }
     }
 
     function showTypingIndicator(data) {
-      if (data.user_id === selectedUser?.id) {
+      if (data.user_id === selectedUserId) {
         const typingDiv = document.getElementById('typingIndicator');
         if (data.is_typing) {
           typingDiv.textContent = `${data.username} is typing...`;
@@ -802,7 +1143,7 @@
     }
 
     // Handle Enter key in message input
-    document.addEventListener('keypress', function(e) {
+    document.addEventListener('keypress', function (e) {
       if (e.key === 'Enter' && e.target.classList.contains('chat-input')) {
         sendMessage();
       }
@@ -810,24 +1151,21 @@
 
     // Handle typing indicator
     let typingTimeout;
-    document.querySelector('.chat-input').addEventListener('input', function() {
-      if (selectedUser && chatSocket && isConnected) {
-        // Send typing indicator
-        chatSocket.send(JSON.stringify({
+    document.querySelector('.chat-input').addEventListener('input', function () {
+      if (chatAppState.selectedUser && chatAppState.chatSocket && chatAppState.isConnected) {
+        chatAppState.chatSocket.send(JSON.stringify({
           type: 'typing',
-          recipient_id: selectedUser.id,
+          recipient_id: chatAppState.selectedUser.id,
           is_typing: true
         }));
-        
-        // Clear previous timeout
+
         clearTimeout(typingTimeout);
-        
-        // Set timeout to stop typing indicator
+
         typingTimeout = setTimeout(() => {
-          if (chatSocket && isConnected) {
-            chatSocket.send(JSON.stringify({
+          if (chatAppState.chatSocket && chatAppState.isConnected) {
+            chatAppState.chatSocket.send(JSON.stringify({
               type: 'typing',
-              recipient_id: selectedUser.id,
+              recipient_id: chatAppState.selectedUser.id,
               is_typing: false
             }));
           }
@@ -836,14 +1174,68 @@
     });
 
     // Cleanup on page unload
-    window.addEventListener('unload', function() {
-      if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
+    window.addEventListener('unload', function () {
+      if (chatAppState.keepAliveInterval) {
+        clearInterval(chatAppState.keepAliveInterval);
       }
-      if (chatSocket) {
-        chatSocket.close();
+      if (chatAppState.chatSocket) {
+        chatAppState.chatSocket.close();
       }
     });
+
+    function loadLocalHistory(userId) {
+      const historyKey = SESSION_KEYS.CHAT_HISTORY + userId;
+      const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
+
+      if (history.length > 0) {
+        displayMessages(history);
+      }
+    }
+
+    async function loadMessagesFromServer(userId) {
+      try {
+        const response = await fetch(`/api/chat/dm/list/${userId}/`, {
+          headers: {
+            'Authorization': `Bearer ${chatAppState.accessToken}`,
+          },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const messages = await response.json();
+          displayMessages(messages);
+
+          const historyKey = SESSION_KEYS.CHAT_HISTORY + userId;
+          localStorage.setItem(historyKey, JSON.stringify(messages));
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    }
+
+    function displayMessages(messages) {
+      const messagesContainer = document.getElementById('messagesContainer');
+      messagesContainer.innerHTML = '';
+
+      console.log('Displaying messages:', messages); // Debu
+      if (!messages || messages.length === 0) {
+        messagesContainer.innerHTML = '<p>No messages yet</p>';
+        return;
+      }
+      messages.forEach(message => {
+        displayMessage({
+          message: message.message,
+          sender_id: message.sender,
+          sender_username: message.sender_username,
+          timestamp: message.timestamp
+        });
+      });
+
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
   </script>
+
 </body>
-</html> 
+
+</html>

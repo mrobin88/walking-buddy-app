@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=True
-      - SECRET_KEY=your-local-secret-key-change-this
+      - SECRET_KEY=admin
       - DATABASE_URL=postgresql://postgres:password@db:5432/walking_buddy
       - REDIS_URL=redis://redis:6379
       - ALLOWED_HOSTS=localhost,127.0.0.1

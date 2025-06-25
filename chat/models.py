@@ -52,4 +52,13 @@ class ChatSession(models.Model):
     
     def get_other_user(self, current_user):
         """Get the other user in the chat session"""
-        return self.user2 if self.user1 == current_user else self.user1 
+        return self.user2 if self.user1 == current_user else self.user1
+
+class Walk(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    start_time = models.DateTimeField(default=timezone.now)
+    end_time = models.DateTimeField(null=True, blank=True)
+    # ... other fields ...
+
+    def __str__(self):
+        return f"Walk by {self.user.username} from {self.start_time} to {self.end_time}"

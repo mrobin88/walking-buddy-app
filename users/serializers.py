@@ -40,14 +40,23 @@ class UserLoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if email and password:
-            user = authenticate(username=email, password=password)
-            if not user:
+            try:
+                # Find user by email only
+                user = User.objects.get(email=email)
+                # Authenticate with the email
+                user = authenticate(username=email, password=password)
+                
+                if not user:
+                    raise serializers.ValidationError('Invalid credentials.')
+                if not user.is_active:
+                    raise serializers.ValidationError('User account is disabled.')
+                
+                # Return the user object
+                return {'user': user}
+            except User.DoesNotExist:
                 raise serializers.ValidationError('Invalid credentials.')
-            if not user.is_active:
-                raise serializers.ValidationError('User account is disabled.')
-            attrs['user'] = user
-        else:
-            raise serializers.ValidationError('Must include email and password.')
+        
+        raise serializers.ValidationError('Must include identifier and password.')
         
         return attrs
 
@@ -94,6 +103,9 @@ class UserLocationSerializer(serializers.ModelSerializer):
         if latitude is not None and longitude is not None:
             instance.update_location(latitude, longitude)
         return instance
+
+
+
 
 
 class FriendshipSerializer(serializers.ModelSerializer):

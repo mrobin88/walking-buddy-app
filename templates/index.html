@@ -250,9 +250,9 @@
       <h1>Walking Buddy App</h1>
       <p>Find walking buddies and explore together</p>
       <div class="nav-buttons">
-        <a href="/" class="nav-btn active">🏠 Home</a>
-        <a href="/chat" class="nav-btn">💬 Chat</a>
-        <a href="/profile" class="nav-btn">👤 Profile</a>
+        <a href="/" class="nav-btn active" onclick="navigateTo(event, '/')">🏠 Home</a>
+        <a href="/chat" class="nav-btn" onclick="navigateTo(event, '/chat/')">💬 Chat</a>
+        <a href="/profile" class="nav-btn" onclick="navigateTo(event, '/profile')">👤 Profile</a>
       </div>
     </div>
 
@@ -358,16 +358,87 @@
   </div>
 
   <script>
-    let currentUser = null;
-    let accessToken = localStorage.getItem('accessToken');
-    let refreshToken = localStorage.getItem('refreshToken');
-
-    // Check authentication on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      if (accessToken) {
-        checkAuth();
+    // Get CSRF token for API requests
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
       }
+      return cookieValue;
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken
+    };
+
+    // Global state
+    let currentUser = null;
+    let accessToken = localStorage.getItem('access_token');
+    let refreshToken = localStorage.getItem('refresh_token');
+
+    // Initialize form validation when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeFormValidation();
+      checkAuth();
+      
+      // Highlight the active navigation item based on current path
+      const path = window.location.pathname;
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('href') === path || 
+            (path === '/' && btn.getAttribute('href') === '/') ||
+            (path.startsWith(btn.getAttribute('href')) && btn.getAttribute('href') !== '/')) {
+          btn.classList.add('active');
+        }
+      });
     });
+    
+    // Handle navigation with authentication check
+    async function navigateTo(event, path) {
+      event.preventDefault();
+      
+      // Check if user is authenticated
+      const accessToken = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+      const refreshToken = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token');
+      
+      if (!accessToken && path !== '/') {
+        // If not authenticated and trying to access protected page, redirect to login
+        window.location.href = '/';
+        return;
+      }
+      
+      // If authenticated, navigate to the requested path
+      if (path === '/') {
+        window.location.href = '/';
+      } else {
+        // For protected routes, use window.location to ensure a full page load
+        window.location.href = path;
+      }
+    }
+
+    // Initialize form validation
+    function initializeFormValidation() {
+      // Password strength indicator
+      const passwordInput = document.getElementById('signupPassword');
+      if (passwordInput) {
+        passwordInput.addEventListener('input', validatePasswordStrength);
+      }
+      
+      // Confirm password validation
+      const confirmPasswordInput = document.getElementById('signupPasswordConfirm');
+      if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+      }
+    }
 
     function toggleAuth() {
       const loginForm = document.getElementById('loginForm');
@@ -389,36 +460,61 @@
     async function handleLogin(event) {
       event.preventDefault();
       
-      const email = document.getElementById('loginEmail').value;
+      const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
+      const loginBtn = event.target.querySelector('button[type="submit"]');
       
       try {
-        const response = await fetch('/api/auth/login/', {
+        setLoading(loginBtn, true);
+        console.log('Attempting login...');
+        
+        const response = await fetch('/api/token/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
           },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({
+            email: email,
+            password: password
+          }),
           credentials: 'include'
         });
         
-        const data = await response.json();
-        
         if (response.ok) {
-          // Store tokens
+          const data = await response.json();
+          console.log('Login successful, storing tokens...');
+          
+          // Store tokens in both formats for compatibility
           localStorage.setItem('accessToken', data.access);
           localStorage.setItem('refreshToken', data.refresh);
+          localStorage.setItem('access_token', data.access);
+          localStorage.setItem('refresh_token', data.refresh);
+          
+          // Update global variables
           accessToken = data.access;
           refreshToken = data.refresh;
           
-          // Update UI
-          currentUser = data.user;
-          showUserProfile();
+          // Verify the token works before redirecting
+          const authCheck = await checkAuth();
+          if (authCheck) {
+            console.log('Auth check passed, redirecting to chat...');
+            // Use window.location.replace to prevent back button issues
+            window.location.replace('/chat/');
+          } else {
+            throw new Error('Failed to verify authentication after login');
+          }
         } else {
-          showError('loginError', data.error || 'Login failed');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Login failed:', response.status, errorData);
+          throw new Error(errorData.detail || 'Login failed. Please check your credentials.');
         }
       } catch (error) {
-        showError('loginError', 'Network error. Please try again.');
+        console.error('Login error:', error);
+        showError('loginError', error.message || 'An error occurred during login. Please try again.');
+      } finally {
+        setLoading(loginBtn, false);
       }
     }
 
@@ -482,41 +578,98 @@
           },
           credentials: 'include'
         });
-        
+
         if (response.ok) {
           const data = await response.json();
+          console.log('User authenticated:', data.username);
           currentUser = data;
           showUserProfile();
-        } else {
-          // Try to refresh token
-          await refreshAccessToken();
+          
+          // If we're on the home page but user is authenticated, redirect to chat
+          if (window.location.pathname === '/') {
+            console.log('Redirecting to chat...');
+            window.location.href = '/chat/';
+          }
+          return true;
+        } else if (response.status === 401 && refreshToken) {
+          console.log('Access token expired, attempting to refresh...');
+          // Try to refresh the token
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            return true;
+          }
         }
+        
+        // If we get here, authentication failed
+        console.log('Authentication failed, showing login form');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('refresh_token');
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('userProfile').classList.add('hidden');
+        return false;
+        
       } catch (error) {
         console.error('Auth check failed:', error);
-        logout();
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('userProfile').classList.add('hidden');
+        return false;
       }
     }
 
     async function refreshAccessToken() {
       try {
+        console.log('Attempting to refresh access token...');
+        const refreshToken = localStorage.getItem('refreshToken') || localStorage.getItem('refresh_token');
+        if (!refreshToken) {
+          console.error('No refresh token available');
+          throw new Error('No refresh token available');
+        }
+        
         const response = await fetch('/api/token/refresh/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify({ refresh: refreshToken }),
+          credentials: 'include',
+          cache: 'no-store'
         });
         
         if (response.ok) {
           const data = await response.json();
+          console.log('Token refresh successful');
+          // Store tokens in both formats for compatibility
           localStorage.setItem('accessToken', data.access);
+          localStorage.setItem('refreshToken', data.refresh);
+          localStorage.setItem('access_token', data.access);
+          localStorage.setItem('refresh_token', data.refresh);
+          
+          // Update the global accessToken variable
           accessToken = data.access;
-          await checkAuth();
+          
+          return true;
         } else {
-          logout();
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Token refresh failed with status:', response.status, errorData);
+          throw new Error(`Failed to refresh token: ${response.status} ${JSON.stringify(errorData)}`);
         }
       } catch (error) {
-        logout();
+        console.error('Token refresh failed:', error);
+        // Clear all tokens on failure
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('refresh_token');
+        
+        // Show login form
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('userProfile').classList.add('hidden');
+        
+        return false;
       }
     }
 
@@ -542,10 +695,145 @@
       }, 1000);
     }
 
+    function validatePasswordStrength() {
+      const password = document.getElementById('signupPassword').value;
+      const strengthIndicator = document.getElementById('password-strength');
+      
+      if (!strengthIndicator) return;
+      
+      // Reset classes
+      strengthIndicator.className = 'password-strength';
+      
+      if (!password) {
+        strengthIndicator.textContent = '';
+        return;
+      }
+      
+      // Check password strength
+      const hasLower = /[a-z]/.test(password);
+      const hasUpper = /[A-Z]/.test(password);
+      const hasNumbers = /\d/.test(password);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+      const isLongEnough = password.length >= 8;
+      
+      let strength = 0;
+      let message = '';
+      
+      if (hasLower) strength++;
+      if (hasUpper) strength++;
+      if (hasNumbers) strength++;
+      if (hasSpecial) strength++;
+      if (isLongEnough) strength += 2; // Extra weight for length
+      
+      // Determine strength level
+      if (strength <= 2) {
+        strengthIndicator.className = 'password-strength weak';
+        message = 'Weak password';
+      } else if (strength <= 4) {
+        strengthIndicator.className = 'password-strength moderate';
+        message = 'Moderate password';
+      } else {
+        strengthIndicator.className = 'password-strength strong';
+        message = 'Strong password';
+      }
+      
+      strengthIndicator.textContent = message;
+    }
+    
+    function validatePasswordMatch() {
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupPasswordConfirm').value;
+      const matchIndicator = document.getElementById('password-match');
+      
+      if (!matchIndicator) return;
+      
+      if (!password || !confirmPassword) {
+        matchIndicator.textContent = '';
+        return;
+      }
+      
+      if (password === confirmPassword) {
+        matchIndicator.className = 'password-match valid';
+        matchIndicator.textContent = 'Passwords match';
+      } else {
+        matchIndicator.className = 'password-match invalid';
+        matchIndicator.textContent = 'Passwords do not match';
+      }
+    }
+    
+    function validateSignupForm() {
+      const email = document.getElementById('signupEmail').value.trim();
+      const username = document.getElementById('signupUsername').value.trim();
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupPasswordConfirm').value;
+      
+      // Basic validation
+      if (!email || !username || !password || !confirmPassword) {
+        return { isValid: false, message: 'All fields are required' };
+      }
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return { isValid: false, message: 'Please enter a valid email address' };
+      }
+      
+      // Password validation
+      if (password.length < 8) {
+        return { isValid: false, message: 'Password must be at least 8 characters long' };
+      }
+      
+      // Password match validation
+      if (password !== confirmPassword) {
+        return { isValid: false, message: 'Passwords do not match' };
+      }
+      
+      return { isValid: true };
+    }
+    
     function showError(elementId, message) {
-      const errorElement = document.getElementById(elementId);
-      errorElement.textContent = message;
-      errorElement.classList.remove('hidden');
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      
+      if (message) {
+        element.innerHTML = message;
+        element.classList.remove('hidden');
+        // Auto-hide error after 5 seconds
+        setTimeout(() => {
+          element.classList.add('hidden');
+        }, 5000);
+      } else {
+        element.classList.add('hidden');
+      }
+    }
+    
+    function showSuccess(message, duration = 3000) {
+      const successElement = document.getElementById('successMessage') || createMessageElement('successMessage', 'success-message');
+      successElement.textContent = message;
+      successElement.classList.remove('hidden');
+      
+      // Auto-hide success message
+      setTimeout(() => {
+        successElement.classList.add('hidden');
+      }, duration);
+    }
+    
+    function createMessageElement(id, className) {
+      const element = document.createElement('div');
+      element.id = id;
+      element.className = `${className} hidden`;
+      document.body.prepend(element);
+      return element;
+    }
+    
+    function setLoading(button, isLoading) {
+      if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+      } else {
+        button.disabled = false;
+        button.innerHTML = button.getAttribute('data-original-text') || 'Submit';
+      }
     }
 
     function logout() {

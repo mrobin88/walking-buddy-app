@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 require('dotenv').config();
 
 // Database connection
@@ -40,6 +41,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Routes (only enable if database is connected)
 if (dbConnected) {
   app.use('/api/auth', authRoutes);
+  app.use('/api/stripe', require('./routes/stripe'));
   app.use('/api/walks', walkRoutes);
 } else {
   // Fallback routes for when database is not available

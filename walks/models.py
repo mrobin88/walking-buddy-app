@@ -1,10 +1,8 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils import timezone
 import uuid
-
-User = get_user_model()
 
 
 class Walk(models.Model):
@@ -124,7 +122,7 @@ class WalkParticipant(models.Model):
     """Model for walk participants."""
     
     walk = models.ForeignKey(Walk, on_delete=models.CASCADE, related_name='participants')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='walks_participated')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='walks_participated')
     
     # Timing
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -153,7 +151,7 @@ class WalkPhoto(models.Model):
     """Model for photos taken during walks."""
     
     walk = models.ForeignKey(Walk, on_delete=models.CASCADE, related_name='photos')
-    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='walk_photos')
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='walk_photos')
     
     # Photo details
     image = models.ImageField(upload_to='walk_photos/')
@@ -176,7 +174,7 @@ class WalkChatMessage(models.Model):
     """Model for chat messages during walks."""
     
     walk = models.ForeignKey(Walk, on_delete=models.CASCADE, related_name='chat_messages')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='walk_messages')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='walk_messages')
     
     # Message content
     message = models.TextField()
@@ -189,4 +187,4 @@ class WalkChatMessage(models.Model):
         ordering = ['created_at']
     
     def __str__(self):
-        return f"{self.user.username}: {self.message[:50]}..." 
+        return f"{self.user.username}: {self.message[:50]}..."

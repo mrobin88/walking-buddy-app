@@ -18,6 +18,7 @@ urlpatterns = [
     path('stats/', views.stats, name='stats'),
     path('location/', views.update_location, name='update_location'),
     path('update-location/', views.update_location, name='update_location_new'),
+    path('online-users/', views.get_online_users, name='online_users'),
     
     # User discovery
     path('nearby-users/', views.nearby_users, name='nearby_users'),
@@ -31,6 +32,9 @@ urlpatterns = [
     path('friend-requests/', views.list_friend_requests, name='list_friend_requests'),
     
     # Admin only endpoints
-    path('admin/users/', views.UserListView.as_view(), name='user_list'),
-    path('system-status/', views.system_status, name='system_status'),
+    path('system-status/', views.SystemStatusView.as_view(), name='system_status'),
+
+    # Ad endpoints
+    path('ads/checkout/', views.create_checkout_session, name='create_checkout_session'),
+    path('webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
 ] 

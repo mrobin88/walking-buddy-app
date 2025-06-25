@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'users',
     'chat',
     'walks',
-    'ads',
+    'advertisements',
 ]
 
 MIDDLEWARE = [
@@ -155,8 +155,7 @@ AUTH_USER_MODEL = 'users.User'
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = [
-    'users.backends.EmailOrUsernameModelBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    'users.backends.EmailAuthenticationBackend',
 ]
 
 # REST Framework with both Session and JWT authentication
@@ -292,4 +291,4 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_your_webh
 STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_your_monthly_subscription')
 
 # Site configuration
-SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000') 
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')

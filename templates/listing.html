@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Buddy - Local Listings</title>
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/listing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Local Listings</h1>
+            <div class="filters">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="walks">Walking Groups</option>
+                    <option value="events">Events</option>
+                    <option value="services">Services</option>
+                    <option value="other">Other</option>
+                </select>
+                <button id="postAdBtn" class="premium-only">
+                    <i class="fas fa-plus"></i> Post an Ad
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <div id="adsContainer" class="grid">
+                <!-- Ads will be loaded here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Premium Modal -->
+    <div id="premiumModal" class="modal">
+        <div class="modal-content">
+            <h2>Get Premium Access</h2>
+            <p>Upgrade to premium to post ads and enjoy more features.</p>
+            <a href="/premium" class="btn primary">Upgrade Now</a>
+            <button class="btn secondary close-modal">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // Get user's location
+        async function getLocation() {
+            if (navigator.geolocation) {
+                return new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => resolve({
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        }),
+                        () => reject('Unable to get location')
+                    );
+                });
+            }
+            return Promise.reject('Geolocation not supported');
+        }
+
+        // Load nearby ads
+        async function loadNearbyAds() {
+            try {
+                const location = await getLocation();
+                const response = await fetch(`/api/users/nearby-ads/?lat=${location.lat}&lon=${location.lon}`);
+                if (!response.ok) throw new Error('Failed to load ads');
+                
+                const ads = await response.json();
+                displayAds(ads);
+            } catch (error) {
+                console.error('Error loading ads:', error);
+            }
+        }
+
+        // Display ads in grid
+        function displayAds(ads) {
+            const container = document.getElementById('adsContainer');
+            container.innerHTML = '';
+            
+            ads.forEach(ad => {
+                const adElement = document.createElement('div');
+                adElement.className = 'ad-card';
+                adElement.innerHTML = `
+                    <div class="ad-header">
+                        <h3>${ad.title}</h3>
+                        <span class="category-badge">${ad.category}</span>
+                    </div>
+                    <img src="${ad.image_url}" alt="${ad.title}" class="ad-image">
+                    <div class="ad-content">
+                        <p>${ad.description}</p>
+                        <div class="ad-meta">
+                            <span class="views">👁️ ${ad.views}</span>
+                            ${ad.price ? `<span class="price">$${ad.price}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(adElement);
+            });
+        }
+
+        // Handle category filter
+        document.getElementById('categoryFilter').addEventListener('change', function(e) {
+            const category = e.target.value;
+            const ads = Array.from(document.querySelectorAll('.ad-card'));
+            
+            if (category) {
+                ads.forEach(ad => {
+                    const categoryBadge = ad.querySelector('.category-badge');
+                    ad.style.display = categoryBadge.textContent.toLowerCase() === category ? 'block' : 'none';
+                });
+            } else {
+                ads.forEach(ad => ad.style.display = 'block');
+            }
+        });
+
+        // Handle post ad button
+        document.getElementById('postAdBtn').addEventListener('click', function() {
+            if (!window.user?.is_premium) {
+                document.getElementById('premiumModal').style.display = 'block';
+                return;
+            }
+            window.location.href = '/post-ad';
+        });
+
+        // Close premium modal
+        document.querySelectorAll('.close-modal').forEach(button => {
+            button.addEventListener('click', () => {
+                document.getElementById('premiumModal').style.display = 'none';
+            });
+        });
+
+        // Initialize
+        loadNearbyAds();
+    </script>
+</body>
+</html>

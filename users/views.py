@@ -13,15 +13,85 @@ from .serializers import (
 from django.db import models
 import psutil
 import os
-from django.db import connection
 from django.http import JsonResponse
 from django.conf import settings
 import stripe
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_online_users(request):
+    """Get list of online users."""
+    online_users = User.objects.filter(is_online=True)
+    serializer = UserProfileSerializer(online_users, many=True)
+    return Response(serializer.data)
 from django.utils import timezone
 from datetime import timedelta
 from django.utils.decorators import method_decorator
+from django.urls import path
+from django.db import connection
+
+# Ad-related views
+# Subscription management
+@api_view(['POST'])
+@csrf_exempt
+@require_http_methods(['POST'])
+def create_checkout_session(request):
+    """Create Stripe checkout session."""
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[
+                {
+                    'price': 'price_1NqJx4SG3BlabLABLABLAB',  # Replace with your actual price ID
+                    'quantity': 1,
+                },
+            ],
+            mode='subscription',
+            success_url=f'{settings.FRONTEND_URL}/premium/success',
+            cancel_url=f'{settings.FRONTEND_URL}/premium/cancel',
+            customer_email=request.user.email,
+            metadata={'user_id': request.user.id}
+        )
+        return Response({'id': checkout_session.id})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def stripe_webhook(request):
+    """Handle Stripe webhook events."""
+    payload = request.body
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+        
+        if event['type'] == 'checkout.session.completed':
+            session = event['data']['object']
+            user_id = session['metadata']['user_id']
+            
+            # Update user's subscription status
+            user = User.objects.get(id=user_id)
+            user.subscription_plan = 'premium'
+            user.subscription_expiry = timezone.now() + timedelta(days=30)
+            user.is_premium = True
+            user.save()
+            
+            # Create or update profile
+            profile, _ = Profile.objects.get_or_create(user=user)
+            profile.stripe_customer_id = session['customer']
+            profile.subscription_expires = user.subscription_expiry
+            profile.save()
+            
+        return JsonResponse({'status': 'success'})
+    except ValueError as e:
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError as e:
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
 
 # Custom authentication class that bypasses CSRF
 class CSRFExemptSessionAuthentication(SessionAuthentication):
@@ -60,26 +130,27 @@ def register(request):
 def login_view(request):
     """Login user with both session and JWT."""
     serializer = UserLoginSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.validated_data['user']
-        
-        # Create session for traditional auth
-        login(request, user)
-        
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        
-        # Update user status
-        user.is_online = True
-        user.save(update_fields=['is_online'])
-        
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserProfileSerializer(user).data
-        })
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = serializer.validated_data['user']
+    
+    # Create session for traditional auth
+    login(request, user)
+    
+    # Generate JWT tokens
+    refresh = RefreshToken.for_user(user)
+    
+    # Update user status
+    user.is_online = True
+    user.save(update_fields=['is_online'])
+    
+    return Response({
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+        'user': UserProfileSerializer(user).data
+    })
 
 
 @api_view(['POST'])
@@ -192,7 +263,12 @@ def send_friend_request(request):
         return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        to_user = User.objects.get(public_id=to_user_id)
+        # Try to get user by public_id (UUID)
+        try:
+            to_user = User.objects.get(public_id=to_user_id)
+        except ValueError:  # If it's not a valid UUID
+            # Try to get user by ID (integer)
+            to_user = User.objects.get(id=to_user_id)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -294,7 +370,18 @@ def nearby_users(request):
     """Find users near the current user's location."""
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
-    radius = float(request.GET.get('radius', 5))  # Default 5km radius
+    
+    # Set default and max radius to 5000km for all users
+    default_radius = 5000  # 5000km default for all users
+    max_radius = 5000  # Maximum radius is 5000km for everyone
+    
+    # Get requested radius, or use default if not provided/invalid
+    try:
+        radius = float(request.GET.get('radius', default_radius))
+        # Enforce maximum radius
+        radius = min(radius, max_radius)
+    except (ValueError, TypeError):
+        radius = default_radius
     
     if not lat or not lon:
         return Response(
@@ -342,62 +429,66 @@ def nearby_users(request):
     
     # Sort by distance
     nearby_users.sort(key=lambda x: x['distance'])
-    return Response(nearby_users)
+    
+    # Add metadata about the search
+    response_data = {
+        'results': nearby_users,
+        'search_metadata': {
+            'radius_used': radius,
+            'max_radius': max_radius,
+            'is_premium': request.user.is_premium,
+            'total_results': len(nearby_users)
+        }
+    }
+    
+    return Response(response_data)
 
 
-class UserListView(generics.ListAPIView):
-    """List all users (admin only)."""
-    queryset = User.objects.all()
-    serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAdminUser]
-    filterset_fields = ['is_online', 'walking_pace']
-    search_fields = ['username', 'first_name', 'last_name']
-    ordering_fields = ['username', 'total_walks', 'average_rating', 'last_active']
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAdminUser])
-def system_status(request):
+class SystemStatusView(generics.GenericAPIView):
     """Get system status and performance metrics."""
-    try:
-        # System resources
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        
-        # Database info
-        db_size = 0
-        if os.path.exists('db.sqlite3'):
-            db_size = os.path.getsize('db.sqlite3') / (1024 * 1024)  # MB
-        
-        # User statistics
-        total_users = User.objects.count()
-        online_users = User.objects.filter(is_online=True).count()
-        
-        # Database queries (if DEBUG is True)
-        query_count = len(connection.queries) if settings.DEBUG else 0
-        
-        return JsonResponse({
-            'system': {
-                'cpu_percent': cpu_percent,
-                'memory_percent': memory.percent,
-                'memory_available_gb': round(memory.available / (1024**3), 2),
-                'disk_percent': disk.percent,
-                'disk_free_gb': round(disk.free / (1024**3), 2),
-            },
-            'application': {
-                'total_users': total_users,
-                'online_users': online_users,
-                'database_size_mb': round(db_size, 2),
-                'query_count': query_count,
-            },
-            'status': 'healthy'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'status': 'error'
-        }, status=500)
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # System resources
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            # Database info
+            db_size = 0
+            if os.path.exists('db.sqlite3'):
+                db_size = os.path.getsize('db.sqlite3') / (1024 * 1024)  # MB
+            
+            # User statistics
+            total_users = User.objects.count()
+            online_users = User.objects.filter(is_online=True).count()
+            
+            # Database queries (if DEBUG is True)
+            query_count = len(connection.queries) if settings.DEBUG else 0
+            
+            return Response({
+                'system': {
+                    'cpu_percent': cpu_percent,
+                    'memory_percent': memory.percent,
+                    'memory_available_gb': round(memory.available / (1024**3), 2),
+                    'disk_percent': disk.percent,
+                    'disk_free_gb': round(disk.free / (1024**3), 2),
+                },
+                'application': {
+                    'total_users': total_users,
+                    'online_users': online_users,
+                    'database_size_mb': round(db_size, 2),
+                    'query_count': query_count,
+                },
+                'status': 'healthy'
+            })
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'status': 'error'
+            }, status=500)
+
 
 
 @api_view(['POST'])

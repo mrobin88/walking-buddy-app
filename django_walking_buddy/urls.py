@@ -9,6 +9,10 @@ from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps.views import sitemap
 from django.views.generic import TemplateView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.urls import re_path
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from chat.routing import websocket_urlpatterns
 
 from users.models import User
 from walks.models import Walk
@@ -38,17 +42,26 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
+    # WebSocket URL
+    re_path(r'^ws/chat/(?P<room_name>[^/]+)/$', AuthMiddlewareStack(
+        URLRouter(
+            websocket_urlpatterns
+        )
+    )),
+    
     # Frontend routes (serve index.html for SPA)
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
-    path('chat/', TemplateView.as_view(template_name='chat.html'), name='chat'),
+    path('chat/', include('chat.urls')),  # Chat routes
     path('profile/', TemplateView.as_view(template_name='profile.html'), name='profile'),
+    path('listing/', TemplateView.as_view(template_name='listing.html'), name='listing'),
+    path('post-ad/', TemplateView.as_view(template_name='post-ad.html'), name='post-ad'),
     
     # Stripe endpoints
     path('api/subscribe/', include('users.stripe_urls')),
     path('api/webhook/stripe/', include('users.webhook_urls')),
     
     # Ad endpoints
-    path('api/ads/', include('ads.urls')),
+    path('api/ads/', include('advertisements.urls')),
     
     # SEO and static pages
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),

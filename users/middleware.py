@@ -3,8 +3,46 @@ import psutil
 import logging
 import re
 from django.utils.deprecation import MiddlewareMixin
+from django.middleware.csrf import CsrfViewMiddleware, get_token
 
 logger = logging.getLogger('performance')
+
+class CSRFExemptionMiddleware(MiddlewareMixin):
+    """Middleware to handle CSRF tokens for authentication endpoints."""
+    
+    EXEMPT_URLS = [
+        r'^/api/auth/login/$',
+        r'^/api/auth/register/$',
+        r'^/api/auth/token/refresh/$',
+        r'^/api/auth/token/verify/$',
+    ]
+    
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        # For login and register endpoints, we want to allow CSRF tokens
+        if any(re.match(url, request.path) for url in self.EXEMPT_URLS):
+            request.csrf_processing_done = True
+            return None
+        return None
+
+    def process_response(self, request, response):
+        # For login and register endpoints, return CSRF token in headers
+        if any(re.match(url, request.path) for url in self.EXEMPT_URLS):
+            if 'csrftoken' not in request.COOKIES:
+                # Create a new CSRF token if it doesn't exist
+                csrf_token = get_token(request)
+                response.set_cookie('csrftoken', csrf_token)
+                response['X-CSRFToken'] = csrf_token
+        return response
+
+    def process_request(self, request):
+        # For all API endpoints, we want to allow CSRF tokens
+        if request.path.startswith('/api/'):
+            # Allow CSRF tokens for these endpoints
+            request.csrf_processing_done = True
+            # Also set the CSRF token in the request
+            if not request.COOKIES.get('csrftoken'):
+                request.COOKIES['csrftoken'] = request.META.get('CSRF_COOKIE', '')
+        return None
 
 class PerformanceMonitoringMiddleware(MiddlewareMixin):
     """Middleware to monitor request performance and system resources."""
@@ -50,9 +88,6 @@ class DatabaseQueryMonitorMiddleware(MiddlewareMixin):
                 logger.debug(f"DB Queries: {queries_count} | Total time: {total_time:.3f}s | Path: {request.path}")
                 
         return response
-
-class CSRFExemptionMiddleware(MiddlewareMixin):
-    """Middleware to exempt API endpoints from CSRF protection."""
     
     def process_request(self, request):
         # Patterns for URLs that should be exempt from CSRF
